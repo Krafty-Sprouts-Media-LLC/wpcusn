@@ -3,7 +3,8 @@ name: Create Release
 on:
   push:
     tags:
-      - 'v*'  # Triggers on tags like v1.0.0, v1.0.1, etc.
+      - 'v*'    # Triggers on tags like v1.0.0, v1.0.1, etc.
+      - '[0-9]*' # Also triggers on tags like 1.0.0, 1.0.1, etc.
 
 jobs:
   release:
@@ -19,7 +20,12 @@ jobs:
       
       - name: Extract version from tag
         id: tag_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Remove 'v' prefix if present
+          VERSION="${TAG#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
       
       - name: Extract changelog entry
         id: changelog
@@ -42,4 +48,3 @@ jobs:
             ${{ steps.changelog.outputs.CHANGELOG }}
           draft: false
           prerelease: false
-
