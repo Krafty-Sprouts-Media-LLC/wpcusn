@@ -118,8 +118,27 @@ class WPCUSN_Status_Mapper {
 			return;
 		}
 
-		// Get list ID
-		$list_id = get_option( 'wpcusn_list_id' );
+		// Get list ID automatically from task (no need to configure in settings)
+		$api = WPCUSN_ClickUp_API::get_instance();
+		
+		// Try stored list ID first
+		$list_id = get_post_meta( $post->ID, '_clickup_list_id', true );
+		
+		// If not stored, get it from the task
+		if ( ! $list_id ) {
+			$task = $api->get_task( $task_id );
+			if ( ! is_wp_error( $task ) && isset( $task['list']['id'] ) ) {
+				$list_id = $task['list']['id'];
+				// Store for future use
+				update_post_meta( $post->ID, '_clickup_list_id', $list_id );
+			}
+		}
+		
+		// If still no list ID, fallback to settings (for backward compatibility)
+		if ( ! $list_id ) {
+			$list_id = get_option( 'wpcusn_list_id' );
+		}
+		
 		if ( ! $list_id ) {
 			return;
 		}
