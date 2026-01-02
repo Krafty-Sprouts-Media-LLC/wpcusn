@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 02/01/2026
+
+### Fixed
+- Reduced log spam: Removed per-page logging during task search, now only logs start and summary (3 entries instead of 50+)
+- Fixed duplicate auto-link runs on page load by adding JS flag to prevent multiple triggers
+- Fixed Task ID input field causing horizontal scroll in metabox - now uses proper width constraint
+
 ## [1.2.2] - 02/01/2026
 
 ### Fixed

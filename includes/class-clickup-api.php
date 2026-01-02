@@ -262,9 +262,9 @@ class WPCUSN_ClickUp_API
 	{
 		$all_tasks = array();
 		$page = 0;
-		$max_pages = 50; // Increased to handle 5000+ tasks
+		$max_pages = 50; // Handle 5000+ tasks
 
-		// Log the search attempt
+		// Log the search attempt (single log entry, not per-page)
 		$this->log_api_debug("Team search starting: team_id={$team_id}, space_id={$space_id}, looking for: '{$task_name}'");
 
 		do {
@@ -281,9 +281,6 @@ class WPCUSN_ClickUp_API
 				break;
 			}
 
-			$page_count = isset($result['tasks']) ? count($result['tasks']) : 0;
-			$this->log_api_debug("Team search page {$page}: found {$page_count} tasks");
-
 			if (isset($result['tasks']) && is_array($result['tasks'])) {
 				$all_tasks = array_merge($all_tasks, $result['tasks']);
 			}
@@ -294,13 +291,14 @@ class WPCUSN_ClickUp_API
 
 		} while ($has_more && $page < $max_pages);
 
+		// Log summary only (not per-page)
 		$total_count = count($all_tasks);
-		$this->log_api_debug("Team search complete: total {$total_count} tasks found across {$page} page(s)");
+		$this->log_api_debug("Team search complete: {$total_count} tasks found across {$page} page(s)");
 
 		// Filter tasks by case-insensitive name match (with fuzzy fallback)
 		$filtered = $this->filter_tasks_by_name($all_tasks, $task_name, true);
 		$match_count = isset($filtered['tasks']) ? count($filtered['tasks']) : 0;
-		$this->log_api_debug("Team search filter result: {$match_count} task(s) matched '{$task_name}'");
+		$this->log_api_debug("Team search result: {$match_count} task(s) matched '{$task_name}'");
 
 		return $filtered;
 	}
