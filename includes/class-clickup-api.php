@@ -121,8 +121,24 @@ class WPCUSN_ClickUp_API {
 			return $data;
 		}
 
-		$error_message = isset( $data['err'] ) ? $data['err'] : 'Unknown error';
-		return new WP_Error( 'clickup_api_error', $error_message, array( 'status' => $status_code ) );
+		// Better error message extraction
+		$error_message = 'Unknown error';
+		if ( isset( $data['err'] ) ) {
+			$error_message = $data['err'];
+		} elseif ( isset( $data['error'] ) ) {
+			$error_message = $data['error'];
+		} elseif ( isset( $data['message'] ) ) {
+			$error_message = $data['message'];
+		} elseif ( ! empty( $body ) ) {
+			$error_message = 'API Error: ' . substr( $body, 0, 200 );
+		}
+
+		// Log the error for debugging
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+			error_log( '[WPCUSN API Error] Endpoint: ' . $endpoint . ', Status: ' . $status_code . ', Response: ' . $body );
+		}
+
+		return new WP_Error( 'clickup_api_error', $error_message, array( 'status' => $status_code, 'response' => $data ) );
 	}
 
 	/**
@@ -271,10 +287,11 @@ class WPCUSN_ClickUp_API {
 	 * @param string $webhook_url The URL to receive webhook events
 	 * @param string $space_id Space ID to subscribe to
 	 * @param string $list_id Optional list ID to limit to specific list
+	 * @param string $team_id Team/Workspace ID (required for endpoint)
 	 * @param array  $events Array of events to subscribe to (default: taskStatusUpdated)
 	 * @return array|WP_Error
 	 */
-	public function create_webhook( $webhook_url, $space_id, $list_id = null, $events = array( 'taskStatusUpdated' ) ) {
+	public function create_webhook( $webhook_url, $space_id, $list_id = null, $team_id = null, $events = array( 'taskStatusUpdated' ) ) {
 		$body = array(
 			'endpoint' => $webhook_url,
 			'events'   => $events,
@@ -286,7 +303,10 @@ class WPCUSN_ClickUp_API {
 		}
 		$body['space_id'] = $space_id;
 
-		return $this->request( '/webhook', 'POST', $body );
+		// ClickUp webhooks are created per team
+		$team_segment = $team_id ? "/team/{$team_id}" : '';
+
+		return $this->request( "{$team_segment}/webhook", 'POST', $body );
 	}
 
 	/**

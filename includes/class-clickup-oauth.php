@@ -269,14 +269,21 @@ class WPCUSN_ClickUp_OAuth {
 	}
 
 	/**
-	 * Check if OAuth is connected
+	 * Check if OAuth is connected or API key is configured
 	 *
 	 * @since 1.0.0
 	 * @return bool
 	 */
 	public function is_connected() {
+		// Check for OAuth token first
 		$access_token = get_option( 'wpcusn_oauth_access_token' );
-		return ! empty( $access_token );
+		if ( ! empty( $access_token ) ) {
+			return true;
+		}
+
+		// Fallback: check for API key
+		$api_key = get_option( 'wpcusn_api_key' );
+		return ! empty( $api_key );
 	}
 }
 

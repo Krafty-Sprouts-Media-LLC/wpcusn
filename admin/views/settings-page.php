@@ -17,7 +17,10 @@ $is_connected = $oauth->is_connected();
 $client_id = get_option( 'wpcusn_oauth_client_id' );
 $client_secret = get_option( 'wpcusn_oauth_client_secret' );
 $api_key = get_option( 'wpcusn_api_key' );
+$space_id = get_option( 'wpcusn_space_id' );
+$team_id = get_option( 'wpcusn_team_id' );
 $list_id = get_option( 'wpcusn_list_id' );
+$webhook_id = get_option( 'wpcusn_webhook_id' );
 $webhook_url = rest_url( 'clickup/v1/webhook' );
 $logs = get_option( 'wpcusn_sync_logs', array() );
 $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
@@ -26,8 +29,9 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 <div class="wrap">
 	<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
 
-	<form method="post" action="options.php">
-		<?php settings_fields( 'wpcusn_settings' ); ?>
+	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+		<input type="hidden" name="action" value="wpcusn_save_settings" />
+		<?php wp_nonce_field( 'wpcusn_save_settings', 'wpcusn_settings_nonce' ); ?>
 
 		<h2><?php esc_html_e( 'Authentication', 'wpcusn' ); ?></h2>
 
@@ -82,13 +86,6 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 					<?php if ( $is_connected ) : ?>
 						<p>
 							<span style="color: green;">✓ <?php esc_html_e( 'Connected to ClickUp', 'wpcusn' ); ?></span>
-						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display: inline;">
-							<input type="hidden" name="action" value="wpcusn_disconnect" />
-							<?php wp_nonce_field( 'wpcusn_disconnect', 'wpcusn_disconnect_nonce' ); ?>
-							<button type="submit" class="button" style="margin-left: 10px;">
-								<?php esc_html_e( 'Disconnect', 'wpcusn' ); ?>
-							</button>
-						</form>
 						</p>
 					<?php endif; ?>
 				</td>
@@ -104,13 +101,18 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 				</th>
 				<td>
 					<?php $space_id = get_option( 'wpcusn_space_id' ); ?>
-					<?php if ( $is_connected ) : ?>
+					<?php if ( $is_connected || $api_key ) : ?>
 						<select id="wpcusn_space_id" name="wpcusn_space_id" class="regular-text">
 							<option value=""><?php esc_html_e( '-- Select a Space --', 'wpcusn' ); ?></option>
 							<?php if ( $space_id ) : ?>
-								<option value="<?php echo esc_attr( $space_id ); ?>" selected><?php echo esc_html( $space_id ); ?> (<?php esc_html_e( 'Current', 'wpcusn' ); ?>)</option>
+								<option value="<?php echo esc_attr( $space_id ); ?>" data-team-id="<?php echo esc_attr( get_option( 'wpcusn_team_id' ) ); ?>" selected><?php echo esc_html( $space_id ); ?></option>
 							<?php endif; ?>
 						</select>
+						<input type="hidden" id="wpcusn_current_space_id" value="<?php echo esc_attr( $space_id ); ?>" />
+						<p style="margin:6px 0 4px 0;">
+							<label for="wpcusn_team_id" style="font-weight:600;"><?php esc_html_e( 'Team ID (auto-filled)', 'wpcusn' ); ?></label><br />
+							<input type="text" id="wpcusn_team_id" name="wpcusn_team_id" value="<?php echo esc_attr( get_option( 'wpcusn_team_id' ) ); ?>" class="regular-text" readonly />
+						</p>
 						<button type="button" id="wpcusn-load-spaces" class="button" style="margin-left: 5px;">
 							<?php esc_html_e( 'Load Spaces', 'wpcusn' ); ?>
 						</button>
@@ -118,14 +120,14 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 						<p class="description">
 							<?php esc_html_e( 'Click "Load Spaces" to fetch your ClickUp spaces. The plugin will search across all lists in the selected space.', 'wpcusn' ); ?>
 						</p>
-						<input type="text" id="wpcusn_space_id_manual" name="wpcusn_space_id" value="<?php echo esc_attr( $space_id ); ?>" class="regular-text" style="display: none; margin-top: 5px;" placeholder="<?php esc_attr_e( 'Or enter Space ID manually', 'wpcusn' ); ?>" />
+						<input type="text" id="wpcusn_space_id_manual" value="<?php echo esc_attr( $space_id ); ?>" class="regular-text" style="display: none; margin-top: 5px;" placeholder="<?php esc_attr_e( 'Or enter Space ID manually', 'wpcusn' ); ?>" />
 						<p class="description" style="margin-top: 5px;">
 							<a href="#" id="wpcusn-toggle-manual-space" style="text-decoration: none;"><?php esc_html_e( 'Enter Space ID manually', 'wpcusn' ); ?></a>
 						</p>
 					<?php else : ?>
 						<input type="text" id="wpcusn_space_id" name="wpcusn_space_id" value="<?php echo esc_attr( $space_id ); ?>" class="regular-text" />
 						<p class="description">
-							<?php esc_html_e( 'Connect to ClickUp first to load spaces automatically, or enter the Space ID manually. Found in the space URL: app.clickup.com/{space_id}/...', 'wpcusn' ); ?>
+							<?php esc_html_e( 'Connect to ClickUp (OAuth) or add an API Key first to load spaces automatically, or enter the Space ID manually. Found in the space URL: app.clickup.com/{space_id}/...', 'wpcusn' ); ?>
 						</p>
 					<?php endif; ?>
 				</td>
@@ -172,71 +174,77 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 			</tr>
 		</table>
 
-		<h2><?php esc_html_e( 'Webhook Configuration', 'wpcusn' ); ?></h2>
-
-		<?php
-		$webhook_id = get_option( 'wpcusn_webhook_id' );
-		$webhook_secret = get_option( 'wpcusn_webhook_secret' );
-		$space_id = get_option( 'wpcusn_space_id' );
-		$is_connected = WPCUSN_ClickUp_OAuth::get_instance()->is_connected();
-		?>
-
-		<table class="form-table">
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Webhook URL', 'wpcusn' ); ?></th>
-				<td>
-					<input type="text" readonly value="<?php echo esc_url( $webhook_url ); ?>" class="regular-text" onclick="this.select();" />
-					<button type="button" class="button" onclick="navigator.clipboard.writeText('<?php echo esc_js( $webhook_url ); ?>'); alert('Copied!');">
-						<?php esc_html_e( 'Copy', 'wpcusn' ); ?>
-					</button>
-				</td>
-			</tr>
-			<?php if ( $webhook_id ) : ?>
-				<tr>
-					<th scope="row"><?php esc_html_e( 'Webhook Status', 'wpcusn' ); ?></th>
-					<td>
-						<span style="color: green;">✓ <?php esc_html_e( 'Webhook is active', 'wpcusn' ); ?></span>
-						<p class="description">
-							<?php esc_html_e( 'Webhook ID:', 'wpcusn' ); ?> <code><?php echo esc_html( $webhook_id ); ?></code>
-						</p>
-					</td>
-				</tr>
-			<?php endif; ?>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Webhook Setup', 'wpcusn' ); ?></th>
-				<td>
-					<?php if ( $is_connected && $space_id ) : ?>
-						<?php if ( ! $webhook_id ) : ?>
-							<form method="post" action="">
-								<?php wp_nonce_field( 'wpcusn_create_webhook' ); ?>
-								<input type="hidden" name="wpcusn_action" value="create_webhook" />
-								<button type="submit" class="button button-primary">
-									<?php esc_html_e( 'Create Webhook Automatically', 'wpcusn' ); ?>
-								</button>
-								<p class="description">
-									<?php esc_html_e( 'This will create a webhook in ClickUp for "taskStatusUpdated" events in your space.', 'wpcusn' ); ?>
-								</p>
-							</form>
-						<?php else : ?>
-							<form method="post" action="">
-								<?php wp_nonce_field( 'wpcusn_delete_webhook' ); ?>
-								<input type="hidden" name="wpcusn_action" value="delete_webhook" />
-								<button type="submit" class="button" onclick="return confirm('<?php esc_attr_e( 'Are you sure you want to delete this webhook?', 'wpcusn' ); ?>');">
-									<?php esc_html_e( 'Delete Webhook', 'wpcusn' ); ?>
-								</button>
-							</form>
-						<?php endif; ?>
-					<?php else : ?>
-						<p class="description">
-							<?php esc_html_e( 'Please connect to ClickUp and configure your Space ID first, then click "Create Webhook Automatically" above.', 'wpcusn' ); ?>
-						</p>
-					<?php endif; ?>
-				</td>
-			</tr>
-		</table>
-
 		<?php submit_button(); ?>
 	</form>
+
+	<h2><?php esc_html_e( 'Webhook Configuration', 'wpcusn' ); ?></h2>
+
+	<table class="form-table">
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Webhook URL', 'wpcusn' ); ?></th>
+			<td>
+				<input type="text" readonly value="<?php echo esc_url( $webhook_url ); ?>" class="regular-text" onclick="this.select();" />
+				<button type="button" class="button" onclick="navigator.clipboard.writeText('<?php echo esc_js( $webhook_url ); ?>'); alert('Copied!');">
+					<?php esc_html_e( 'Copy', 'wpcusn' ); ?>
+				</button>
+				<p class="description">
+					<?php esc_html_e( 'This is the URL that ClickUp will send webhook events to.', 'wpcusn' ); ?>
+				</p>
+			</td>
+		</tr>
+		<?php if ( $webhook_id ) : ?>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Webhook Status', 'wpcusn' ); ?></th>
+				<td>
+					<span style="color: green;">✓ <?php esc_html_e( 'Webhook is active', 'wpcusn' ); ?></span>
+					<p class="description">
+						<?php esc_html_e( 'Webhook ID:', 'wpcusn' ); ?> <code><?php echo esc_html( $webhook_id ); ?></code>
+					</p>
+				</td>
+			</tr>
+		<?php endif; ?>
+	</table>
+
+	<?php if ( ($is_connected || $api_key) && $space_id ) : ?>
+		<?php if ( ! $webhook_id ) : ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top: 10px;">
+				<input type="hidden" name="action" value="wpcusn_save_settings" />
+				<?php wp_nonce_field( 'wpcusn_save_settings', 'wpcusn_settings_nonce' ); ?>
+				<?php wp_nonce_field( 'wpcusn_create_webhook', '_wpnonce' ); ?>
+				<input type="hidden" name="wpcusn_action" value="create_webhook" />
+				<button type="submit" class="button button-primary">
+					<?php esc_html_e( 'Create Webhook Automatically', 'wpcusn' ); ?>
+				</button>
+				<p class="description">
+					<?php esc_html_e( 'This will create a webhook in ClickUp for "taskStatusUpdated" events in your space.', 'wpcusn' ); ?>
+				</p>
+			</form>
+		<?php else : ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top: 10px;">
+				<input type="hidden" name="action" value="wpcusn_save_settings" />
+				<?php wp_nonce_field( 'wpcusn_save_settings', 'wpcusn_settings_nonce' ); ?>
+				<?php wp_nonce_field( 'wpcusn_delete_webhook', '_wpnonce' ); ?>
+				<input type="hidden" name="wpcusn_action" value="delete_webhook" />
+				<button type="submit" class="button" onclick="return confirm('<?php esc_attr_e( 'Are you sure you want to delete this webhook?', 'wpcusn' ); ?>');">
+					<?php esc_html_e( 'Delete Webhook', 'wpcusn' ); ?>
+				</button>
+			</form>
+		<?php endif; ?>
+	<?php else : ?>
+		<p class="description">
+			<?php esc_html_e( 'Please connect to ClickUp and configure your Space ID first, then click "Create Webhook Automatically" above.', 'wpcusn' ); ?>
+		</p>
+	<?php endif; ?>
+
+	<?php if ( $is_connected ) : ?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top: 20px;">
+			<input type="hidden" name="action" value="wpcusn_disconnect" />
+			<?php wp_nonce_field( 'wpcusn_disconnect', 'wpcusn_disconnect_nonce' ); ?>
+			<button type="submit" class="button" onclick="return confirm('<?php esc_attr_e( 'Are you sure you want to disconnect from ClickUp?', 'wpcusn' ); ?>');">
+				<?php esc_html_e( 'Disconnect from ClickUp', 'wpcusn' ); ?>
+			</button>
+		</form>
+	<?php endif; ?>
 
 	<h2><?php esc_html_e( 'Sync Logs', 'wpcusn' ); ?></h2>
 
@@ -300,10 +308,22 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 	<?php endif; ?>
 </div>
 
-<?php if ( $is_connected ) : ?>
+<?php if ( $is_connected || $api_key ) : ?>
 <script>
 jQuery(document).ready(function($) {
 	var loadingSpaces = false;
+	
+	// Ensure manual input starts disabled (since it's hidden by default)
+	$('#wpcusn_space_id_manual').prop('disabled', true);
+	
+	// Auto-load spaces on page load if dropdown is visible
+	var select = $('#wpcusn_space_id');
+	if (select.is(':visible') && select.length) {
+		// Small delay to ensure page is fully loaded
+		setTimeout(function() {
+			$('#wpcusn-load-spaces').trigger('click');
+		}, 100);
+	}
 
 	$('#wpcusn-load-spaces').on('click', function() {
 		if (loadingSpaces) return;
@@ -325,19 +345,37 @@ jQuery(document).ready(function($) {
 			},
 			success: function(response) {
 				if (response.success && response.data.spaces) {
+					// Get current saved space ID from hidden input BEFORE clearing options
+					var currentSpaceId = $('#wpcusn_current_space_id').val() || '';
+					
 					// Clear existing options except the first one
 					select.find('option:not(:first)').remove();
 					
 					// Add spaces
 					$.each(response.data.spaces, function(i, space) {
-						var selected = space.id === '<?php echo esc_js( $space_id ); ?>' ? ' selected' : '';
-						var label = space.name + ' (' + space.team_name + ') - ID: ' + space.id;
-						select.append('<option value="' + space.id + '"' + selected + '>' + label + '</option>');
+						// Check if this space matches the currently saved one
+						var selected = (space.id === currentSpaceId) ? ' selected' : '';
+						// Display format: "Space Name (Team Name)" - cleaner, no ID clutter
+						var label = space.name + (space.team_name ? ' (' + space.team_name + ')' : '');
+						select.append('<option value="' + space.id + '"' + selected + ' data-team-id="' + space.team_id + '">' + label + '</option>');
 					});
 					
 					if (response.data.spaces.length === 0) {
 						select.append('<option value=""><?php esc_html_e( 'No spaces found', 'wpcusn' ); ?></option>');
 					}
+
+									// Set team id for currently selected option
+									var teamInput = $('#wpcusn_team_id');
+									var selectedOpt = select.find('option:selected');
+									if (selectedOpt.length) {
+										teamInput.val(selectedOpt.data('team-id') || '');
+									}
+
+									// Update team id when selection changes
+									select.off('change.wpcusn').on('change.wpcusn', function() {
+										var opt = $(this).find('option:selected');
+										teamInput.val(opt.data('team-id') || '');
+									});
 				} else {
 					alert(response.data.message || '<?php esc_html_e( 'Failed to load spaces', 'wpcusn' ); ?>');
 				}
@@ -358,15 +396,23 @@ jQuery(document).ready(function($) {
 		var select = $('#wpcusn_space_id');
 		var manual = $('#wpcusn_space_id_manual');
 		var link = $(this);
+		var teamInput = $('#wpcusn_team_id');
 		
 		if (manual.is(':visible')) {
-			manual.hide();
-			select.show();
+			// Switching to dropdown - give name to select, remove from manual, hide manual
+			select.attr('name', 'wpcusn_space_id').prop('disabled', false).show();
+			manual.removeAttr('name').hide();
 			link.text('<?php esc_html_e( 'Enter Space ID manually', 'wpcusn' ); ?>');
+			// restore team id from selected option
+			var opt = select.find('option:selected');
+			teamInput.val(opt.data('team-id') || '');
 		} else {
-			select.hide();
-			manual.show();
+			// Switching to manual - give name to manual, remove from select, hide select
+			manual.attr('name', 'wpcusn_space_id').show();
+			select.removeAttr('name').prop('disabled', true).hide();
 			link.text('<?php esc_html_e( 'Use dropdown instead', 'wpcusn' ); ?>');
+			// manual entry has no team context; clear team id to fallback later
+			teamInput.val('');
 		}
 	});
 });

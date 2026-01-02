@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.9] - 02/01/2026
+
+### Fixed
+- Fixed space ID not saving when selecting from dropdown - manual input was overriding dropdown selection
+- Fixed duplicate webhook success notices - removed manual transient storage that caused duplicates
+- Fixed webhook success notice not displaying after creation - restored transient storage for custom form handlers
+- Fixed spaces dropdown showing only IDs - now displays "Space Name (Team Name)" format
+- Spaces now auto-load on page load - no need to click "Load Spaces" button every time
+- Fixed nested forms issue - moved webhook forms outside main form to prevent HTML validation issues
+- Improved space selection persistence - selected space now correctly saves and displays after page reload
+
+## [1.1.8] - 02/01/2026
+
+### Fixed
+- Prevented webhook actions from clearing settings and ensured team ID is captured and sent for webhook creation
+- Improved ClickUp webhook creation endpoint to use the required team path and added fallback to first team when not provided
+- Hid "Disconnected" notice during settings saves; it only shows when explicitly requested
+- Better API error logging with endpoint and response details
+
+## [1.1.7] - 02/01/2026
+
+### Fixed
+- Fixed webhook creation/deletion clearing all settings - webhook actions now skip settings save to preserve existing configuration
+- Settings are only saved when actually submitted in the form, not when webhook buttons are clicked
+
+## [1.1.6] - 02/01/2026
+
+### Changed
+- Replaced WordPress Settings API form handler with custom form handler for full control over redirect behavior
+- Form now submits to custom `admin-post.php` handler instead of `options.php`
+- Settings are now saved manually with proper sanitization and nonce verification
+
+### Fixed
+- Fixed redirect to `options.php` after saving settings - now always redirects back to plugin settings page
+- API Key authentication now properly recognized - Space dropdown and Load Spaces button work with API key
+- Added debug logging (enabled when `WP_DEBUG` and `WP_DEBUG_LOG` are true) to help troubleshoot issues
+
 ## [1.1.5] - 2026-01-02
 
 ### Fixed
