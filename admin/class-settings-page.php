@@ -5,7 +5,7 @@
  * @package WPCUSN
  * @author Krafty Sprouts Media, LLC
  * @since 1.0.0
- * @version 1.1.3
+ * @version 1.1.4
  * @last_modified 2026-01-02
  *
  * Handles the admin settings page for the plugin.
@@ -48,7 +48,6 @@ class WPCUSN_Settings_Page {
 	private function __construct() {
 		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
-		add_action( 'load-options.php', array( $this, 'force_redirect_after_save' ) );
 		add_action( 'admin_notices', array( $this, 'show_admin_notices' ) );
 		add_action( 'wp_ajax_wpcusn_get_spaces', array( $this, 'ajax_get_spaces' ) );
 		add_action( 'admin_post_wpcusn_disconnect', array( $this, 'handle_disconnect' ) );
@@ -160,18 +159,6 @@ class WPCUSN_Settings_Page {
 			}
 		}
 		return $location;
-	}
-
-	/**
-	 * Force redirect when saving via options.php (catch-all)
-	 *
-	 * @since 1.1.3
-	 */
-	public function force_redirect_after_save() {
-		if ( isset( $_POST['option_page'] ) && 'wpcusn_settings' === $_POST['option_page'] ) {
-			wp_safe_redirect( admin_url( 'options-general.php?page=wpcusn&settings-updated=1' ) );
-			exit;
-		}
 	}
 
 	/**

@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Saving settings (including selecting a Space) now redirects back to the plugin settings page instead of options.php
 
+## [1.1.4] - 2026-01-02
+
+### Fixed
+- Removed aggressive redirect hook that prevented options from being saved (Space selection now saves correctly)
+
 ## [1.1.2] - 2026-01-02
 
 ### Fixed
