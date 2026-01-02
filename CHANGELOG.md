@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.7] - 02/01/2026
+
+### Added
+- **Configurable Sync Direction**: New settings to control sync direction
+  - WordPress → ClickUp toggle (default ON)
+  - ClickUp → WordPress toggle (default ON)
+  - Allows disabling one-way or both-way sync as needed
+
+### Note
+- Settings UI is complete and functional. Enforcement of these settings will be implemented in the next update.
+
 ## [1.2.6] - 02/01/2026
 
 ### Fixed

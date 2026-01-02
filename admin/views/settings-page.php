@@ -164,6 +164,42 @@ $logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
 			</tr>
 		</table>
 
+	<h2><?php esc_html_e('Sync Direction', 'wpcusn'); ?></h2>
+	<p class="description" style="margin-bottom: 15px;">
+		<?php esc_html_e('Control which direction status changes are synchronized.', 'wpcusn'); ?>
+	</p>
+
+	<table class="form-table">
+		<tr>
+			<th scope="row">
+				<label for="wpcusn_sync_wp_to_clickup"><?php esc_html_e('WordPress → ClickUp', 'wpcusn'); ?></label>
+			</th>
+			<td>
+				<label>
+					<input type="checkbox" id="wpcusn_sync_wp_to_clickup" name="wpcusn_sync_wp_to_clickup" value="1" <?php checked(get_option('wpcusn_sync_wp_to_clickup', true)); ?> />
+					<?php esc_html_e('Sync WordPress post status changes to ClickUp', 'wpcusn'); ?>
+				</label>
+				<p class="description">
+					<?php esc_html_e('When you change a post status in WordPress, update the linked ClickUp task.', 'wpcusn'); ?>
+				</p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row">
+				<label for="wpcusn_sync_clickup_to_wp"><?php esc_html_e('ClickUp → WordPress', 'wpcusn'); ?></label>
+			</th>
+			<td>
+				<label>
+					<input type="checkbox" id="wpcusn_sync_clickup_to_wp" name="wpcusn_sync_clickup_to_wp" value="1" <?php checked(get_option('wpcusn_sync_clickup_to_wp', true)); ?> />
+					<?php esc_html_e('Sync ClickUp task status changes to WordPress', 'wpcusn'); ?>
+				</label>
+				<p class="description">
+					<?php esc_html_e('When a ClickUp task status changes, update the linked WordPress post via webhook.', 'wpcusn'); ?>
+				</p>
+			</td>
+		</tr>
+	</table>
+
 		<h2><?php esc_html_e('Search & Log Settings', 'wpcusn'); ?></h2>
 		<p class="description" style="margin-bottom: 15px;">
 			<?php esc_html_e('Configure search behavior and log retention for optimal performance.', 'wpcusn'); ?>

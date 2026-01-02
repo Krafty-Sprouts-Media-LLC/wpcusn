@@ -149,6 +149,9 @@ class WPCUSN_Settings_Page
 				'wpcusn_space_id' => isset($_POST['wpcusn_space_id']) ? sanitize_text_field($_POST['wpcusn_space_id']) : '',
 				'wpcusn_team_id' => isset($_POST['wpcusn_team_id']) ? sanitize_text_field($_POST['wpcusn_team_id']) : '',
 				'wpcusn_list_id' => isset($_POST['wpcusn_list_id']) ? sanitize_text_field($_POST['wpcusn_list_id']) : '',
+				// Sync Direction settings
+				'wpcusn_sync_wp_to_clickup' => isset($_POST['wpcusn_sync_wp_to_clickup']) ? 1 : 0,
+				'wpcusn_sync_clickup_to_wp' => isset($_POST['wpcusn_sync_clickup_to_wp']) ? 1 : 0,
 				// Search & Log settings
 				'wpcusn_include_closed_tasks' => isset($_POST['wpcusn_include_closed_tasks']) ? 1 : 0,
 				'wpcusn_log_limit' => isset($_POST['wpcusn_log_limit']) ? absint($_POST['wpcusn_log_limit']) : 200,
