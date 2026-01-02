@@ -5,21 +5,22 @@
  * @package WPCUSN
  * @author Krafty Sprouts Media, LLC
  * @since 1.0.0
- * @version 1.1.4
+ * @version 1.1.5
  * @last_modified 2026-01-02
  *
  * Handles the admin settings page for the plugin.
  */
 
 // Exit if accessed directly
-if ( ! defined( 'ABSPATH' ) ) {
+if (!defined('ABSPATH')) {
 	exit;
 }
 
 /**
  * Settings Page Class
  */
-class WPCUSN_Settings_Page {
+class WPCUSN_Settings_Page
+{
 	/**
 	 * Single instance
 	 *
@@ -33,8 +34,9 @@ class WPCUSN_Settings_Page {
 	 * @since 1.0.0
 	 * @return WPCUSN_Settings_Page
 	 */
-	public static function get_instance() {
-		if ( null === self::$instance ) {
+	public static function get_instance()
+	{
+		if (null === self::$instance) {
 			self::$instance = new self();
 		}
 		return self::$instance;
@@ -45,12 +47,13 @@ class WPCUSN_Settings_Page {
 	 *
 	 * @since 1.0.0
 	 */
-	private function __construct() {
-		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
-		add_action( 'admin_init', array( $this, 'register_settings' ) );
-		add_action( 'admin_notices', array( $this, 'show_admin_notices' ) );
-		add_action( 'wp_ajax_wpcusn_get_spaces', array( $this, 'ajax_get_spaces' ) );
-		add_action( 'admin_post_wpcusn_disconnect', array( $this, 'handle_disconnect' ) );
+	private function __construct()
+	{
+		add_action('admin_menu', array($this, 'add_settings_page'));
+		add_action('admin_init', array($this, 'register_settings'));
+		add_action('admin_notices', array($this, 'show_admin_notices'));
+		add_action('wp_ajax_wpcusn_get_spaces', array($this, 'ajax_get_spaces'));
+		add_action('admin_post_wpcusn_disconnect', array($this, 'handle_disconnect'));
 	}
 
 	/**
@@ -58,13 +61,14 @@ class WPCUSN_Settings_Page {
 	 *
 	 * @since 1.0.0
 	 */
-	public function add_settings_page() {
+	public function add_settings_page()
+	{
 		add_options_page(
-			__( 'WPCUSN Settings', 'wpcusn' ),
-			__( 'ClickUp Sync', 'wpcusn' ),
+			__('WPCUSN Settings', 'wpcusn'),
+			__('ClickUp Sync', 'wpcusn'),
 			'manage_options',
 			'wpcusn',
-			array( $this, 'render_settings_page' )
+			array($this, 'render_settings_page')
 		);
 	}
 
@@ -73,92 +77,93 @@ class WPCUSN_Settings_Page {
 	 *
 	 * @since 1.0.0
 	 */
-	public function register_settings() {
+	public function register_settings()
+	{
 		// OAuth settings
-		register_setting( 'wpcusn_settings', 'wpcusn_oauth_client_id' );
-		register_setting( 'wpcusn_settings', 'wpcusn_oauth_client_secret' );
+		register_setting('wpcusn_settings', 'wpcusn_oauth_client_id');
+		register_setting('wpcusn_settings', 'wpcusn_oauth_client_secret');
 
 		// API Key (fallback)
-		register_setting( 'wpcusn_settings', 'wpcusn_api_key' );
+		register_setting('wpcusn_settings', 'wpcusn_api_key');
 
 		// Space ID (primary)
-		register_setting( 'wpcusn_settings', 'wpcusn_space_id' );
+		register_setting('wpcusn_settings', 'wpcusn_space_id');
 
 		// List ID (optional, for limiting search to specific list)
-		register_setting( 'wpcusn_settings', 'wpcusn_list_id' );
+		register_setting('wpcusn_settings', 'wpcusn_list_id');
 
-		// Redirect back to settings page after save
-		add_filter( 'wp_redirect', array( $this, 'redirect_after_save' ), 10, 2 );
+		// Hook into the settings save process to redirect back to our page
+		// This filter fires right before WordPress sets the settings errors transient
+		add_filter('pre_set_transient_settings_errors', array($this, 'maybe_redirect_after_save'));
 
 		// Handle disconnect moved to separate handler
 
 		// Handle webhook creation
-		if ( isset( $_POST['wpcusn_action'] ) && 'create_webhook' === $_POST['wpcusn_action'] && check_admin_referer( 'wpcusn_create_webhook' ) ) {
-			$space_id = get_option( 'wpcusn_space_id' );
-			$list_id = get_option( 'wpcusn_list_id' );
-			$webhook_url = rest_url( 'clickup/v1/webhook' );
+		if (isset($_POST['wpcusn_action']) && 'create_webhook' === $_POST['wpcusn_action'] && check_admin_referer('wpcusn_create_webhook')) {
+			$space_id = get_option('wpcusn_space_id');
+			$list_id = get_option('wpcusn_list_id');
+			$webhook_url = rest_url('clickup/v1/webhook');
 
-			if ( ! $space_id ) {
-				add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_error', __( 'Please configure Space ID first.', 'wpcusn' ), 'error' );
+			if (!$space_id) {
+				add_settings_error('wpcusn_settings', 'wpcusn_webhook_error', __('Please configure Space ID first.', 'wpcusn'), 'error');
 			} else {
 				$api = WPCUSN_ClickUp_API::get_instance();
-				$result = $api->create_webhook( $webhook_url, $space_id, $list_id );
+				$result = $api->create_webhook($webhook_url, $space_id, $list_id);
 
-				if ( is_wp_error( $result ) ) {
-					add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_error', __( 'Failed to create webhook: ', 'wpcusn' ) . $result->get_error_message(), 'error' );
-				} elseif ( isset( $result['webhook']['id'] ) ) {
-					update_option( 'wpcusn_webhook_id', $result['webhook']['id'] );
-					if ( isset( $result['webhook']['secret'] ) ) {
-						update_option( 'wpcusn_webhook_secret', $result['webhook']['secret'] );
+				if (is_wp_error($result)) {
+					add_settings_error('wpcusn_settings', 'wpcusn_webhook_error', __('Failed to create webhook: ', 'wpcusn') . $result->get_error_message(), 'error');
+				} elseif (isset($result['webhook']['id'])) {
+					update_option('wpcusn_webhook_id', $result['webhook']['id']);
+					if (isset($result['webhook']['secret'])) {
+						update_option('wpcusn_webhook_secret', $result['webhook']['secret']);
 					}
-					add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_created', __( 'Webhook created successfully!', 'wpcusn' ), 'success' );
+					add_settings_error('wpcusn_settings', 'wpcusn_webhook_created', __('Webhook created successfully!', 'wpcusn'), 'success');
 				} else {
-					add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_error', __( 'Unexpected response from ClickUp API.', 'wpcusn' ), 'error' );
+					add_settings_error('wpcusn_settings', 'wpcusn_webhook_error', __('Unexpected response from ClickUp API.', 'wpcusn'), 'error');
 				}
 			}
 		}
 
 		// Handle webhook deletion
-		if ( isset( $_POST['wpcusn_action'] ) && 'delete_webhook' === $_POST['wpcusn_action'] && check_admin_referer( 'wpcusn_delete_webhook' ) ) {
-			$webhook_id = get_option( 'wpcusn_webhook_id' );
-			if ( $webhook_id ) {
+		if (isset($_POST['wpcusn_action']) && 'delete_webhook' === $_POST['wpcusn_action'] && check_admin_referer('wpcusn_delete_webhook')) {
+			$webhook_id = get_option('wpcusn_webhook_id');
+			if ($webhook_id) {
 				$api = WPCUSN_ClickUp_API::get_instance();
-				$result = $api->delete_webhook( $webhook_id );
+				$result = $api->delete_webhook($webhook_id);
 
-				if ( is_wp_error( $result ) ) {
-					add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_error', __( 'Failed to delete webhook: ', 'wpcusn' ) . $result->get_error_message(), 'error' );
+				if (is_wp_error($result)) {
+					add_settings_error('wpcusn_settings', 'wpcusn_webhook_error', __('Failed to delete webhook: ', 'wpcusn') . $result->get_error_message(), 'error');
 				} else {
-					delete_option( 'wpcusn_webhook_id' );
-					delete_option( 'wpcusn_webhook_secret' );
-					add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_deleted', __( 'Webhook deleted successfully.', 'wpcusn' ), 'success' );
+					delete_option('wpcusn_webhook_id');
+					delete_option('wpcusn_webhook_secret');
+					add_settings_error('wpcusn_settings', 'wpcusn_webhook_deleted', __('Webhook deleted successfully.', 'wpcusn'), 'success');
 				}
 			}
 		}
 	}
 
 	/**
-	 * Redirect back to settings page after save
+	 * Handle redirect after our settings are saved
 	 *
-	 * @since 1.1.0
-	 * @param string $location Redirect URL
-	 * @param int    $status   HTTP status code
-	 * @return string
+	 * This hooks into 'pre_set_transient_settings_errors' filter which fires
+	 * right before WordPress sets the settings errors transient and redirects.
+	 * We intercept this to redirect to our own page instead.
+	 *
+	 * @since 1.1.5
+	 * @param array $value The settings errors array.
+	 * @return array The settings errors array (passed through).
 	 */
-	public function redirect_after_save( $location, $status ) {
-		// Only redirect if we're coming from our settings page
-		// Check if this is our settings form submission
-		if ( isset( $_POST['option_page'] ) && 'wpcusn_settings' === $_POST['option_page'] ) {
-			// Always redirect back to our settings page
-			return admin_url( 'options-general.php?page=wpcusn&settings-updated=1' );
+	public function maybe_redirect_after_save($value)
+	{
+		// Only process on options.php (the WP Settings API save page)
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WordPress core in options.php
+		if (!isset($_POST['option_page']) || 'wpcusn_settings' !== $_POST['option_page']) {
+			return $value;
 		}
-		// Also check if location contains options.php (WordPress default redirect)
-		if ( strpos( $location, 'options.php' ) !== false ) {
-			// Check if we have our option_page in POST (means we just saved)
-			if ( isset( $_POST['option_page'] ) && 'wpcusn_settings' === $_POST['option_page'] ) {
-				return admin_url( 'options-general.php?page=wpcusn&settings-updated=1' );
-			}
-		}
-		return $location;
+
+		// WordPress is about to redirect - intercept and go to our page instead
+		wp_safe_redirect(admin_url('options-general.php?page=wpcusn&settings-updated=1'));
+		exit;
 	}
 
 	/**
@@ -166,26 +171,27 @@ class WPCUSN_Settings_Page {
 	 *
 	 * @since 1.0.0
 	 */
-	public function show_admin_notices() {
-		if ( ! isset( $_GET['page'] ) || 'wpcusn' !== $_GET['page'] ) {
+	public function show_admin_notices()
+	{
+		if (!isset($_GET['page']) || 'wpcusn' !== $_GET['page']) {
 			return;
 		}
 
-		if ( isset( $_GET['oauth_success'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Successfully connected to ClickUp!', 'wpcusn' ) . '</p></div>';
+		if (isset($_GET['oauth_success'])) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Successfully connected to ClickUp!', 'wpcusn') . '</p></div>';
 		}
 
-		if ( isset( $_GET['oauth_error'] ) ) {
-			$error = isset( $_GET['oauth_error'] ) ? sanitize_text_field( $_GET['oauth_error'] ) : '';
-			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'OAuth error: ', 'wpcusn' ) . esc_html( $error ) . '</p></div>';
+		if (isset($_GET['oauth_error'])) {
+			$error = isset($_GET['oauth_error']) ? sanitize_text_field($_GET['oauth_error']) : '';
+			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('OAuth error: ', 'wpcusn') . esc_html($error) . '</p></div>';
 		}
 
-		if ( isset( $_GET['disconnected'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Disconnected from ClickUp.', 'wpcusn' ) . '</p></div>';
+		if (isset($_GET['disconnected'])) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Disconnected from ClickUp.', 'wpcusn') . '</p></div>';
 		}
 
-		if ( isset( $_GET['settings-updated'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'wpcusn' ) . '</p></div>';
+		if (isset($_GET['settings-updated'])) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Settings saved.', 'wpcusn') . '</p></div>';
 		}
 	}
 
@@ -194,7 +200,8 @@ class WPCUSN_Settings_Page {
 	 *
 	 * @since 1.0.0
 	 */
-	public function render_settings_page() {
+	public function render_settings_page()
+	{
 		include WPCUSN_PLUGIN_DIR . 'admin/views/settings-page.php';
 	}
 
@@ -203,16 +210,17 @@ class WPCUSN_Settings_Page {
 	 *
 	 * @since 1.0.9
 	 */
-	public function handle_disconnect() {
-		check_admin_referer( 'wpcusn_disconnect', 'wpcusn_disconnect_nonce' );
-		
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( __( 'Unauthorized', 'wpcusn' ) );
+	public function handle_disconnect()
+	{
+		check_admin_referer('wpcusn_disconnect', 'wpcusn_disconnect_nonce');
+
+		if (!current_user_can('manage_options')) {
+			wp_die(__('Unauthorized', 'wpcusn'));
 		}
-		
+
 		$oauth = WPCUSN_ClickUp_OAuth::get_instance();
 		$oauth->disconnect();
-		wp_safe_redirect( admin_url( 'options-general.php?page=wpcusn&disconnected=1' ) );
+		wp_safe_redirect(admin_url('options-general.php?page=wpcusn&disconnected=1'));
 		exit;
 	}
 
@@ -221,40 +229,41 @@ class WPCUSN_Settings_Page {
 	 *
 	 * @since 1.0.7
 	 */
-	public function ajax_get_spaces() {
-		check_ajax_referer( 'wpcusn_get_spaces', 'nonce' );
+	public function ajax_get_spaces()
+	{
+		check_ajax_referer('wpcusn_get_spaces', 'nonce');
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Unauthorized', 'wpcusn' ) ) );
+		if (!current_user_can('manage_options')) {
+			wp_send_json_error(array('message' => __('Unauthorized', 'wpcusn')));
 		}
 
 		$api = WPCUSN_ClickUp_API::get_instance();
 
 		// Get teams first
 		$teams_result = $api->get_teams();
-		if ( is_wp_error( $teams_result ) ) {
-			wp_send_json_error( array( 'message' => $teams_result->get_error_message() ) );
+		if (is_wp_error($teams_result)) {
+			wp_send_json_error(array('message' => $teams_result->get_error_message()));
 		}
 
 		$all_spaces = array();
 
 		// Get spaces from all teams
-		if ( isset( $teams_result['teams'] ) && is_array( $teams_result['teams'] ) ) {
-			foreach ( $teams_result['teams'] as $team ) {
+		if (isset($teams_result['teams']) && is_array($teams_result['teams'])) {
+			foreach ($teams_result['teams'] as $team) {
 				$team_id = $team['id'] ?? '';
 				$team_name = $team['name'] ?? '';
 
-				if ( ! $team_id ) {
+				if (!$team_id) {
 					continue;
 				}
 
-				$spaces_result = $api->get_spaces( $team_id );
-				if ( ! is_wp_error( $spaces_result ) && isset( $spaces_result['spaces'] ) && is_array( $spaces_result['spaces'] ) ) {
-					foreach ( $spaces_result['spaces'] as $space ) {
+				$spaces_result = $api->get_spaces($team_id);
+				if (!is_wp_error($spaces_result) && isset($spaces_result['spaces']) && is_array($spaces_result['spaces'])) {
+					foreach ($spaces_result['spaces'] as $space) {
 						$all_spaces[] = array(
-							'id'       => $space['id'] ?? '',
-							'name'     => $space['name'] ?? '',
-							'team_id'  => $team_id,
+							'id' => $space['id'] ?? '',
+							'name' => $space['name'] ?? '',
+							'team_id' => $team_id,
 							'team_name' => $team_name,
 						);
 					}
@@ -262,7 +271,7 @@ class WPCUSN_Settings_Page {
 			}
 		}
 
-		wp_send_json_success( array( 'spaces' => $all_spaces ) );
+		wp_send_json_success(array('spaces' => $all_spaces));
 	}
 }
 

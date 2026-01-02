@@ -3,7 +3,7 @@
  * Plugin Name: WPCUSN - WordPress ClickUp Sync-nator
  * Plugin URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
  * Description: Two-way status synchronization between WordPress and ClickUp
- * Version: 1.1.4
+ * Version: 1.1.5
  * Author: Krafty Sprouts Media, LLC
  * Author URI: https://animalofthings.com
  * GitHub URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
@@ -19,21 +19,22 @@
  */
 
 // Exit if accessed directly
-if ( ! defined( 'ABSPATH' ) ) {
+if (!defined('ABSPATH')) {
 	exit;
 }
 
 // Define plugin constants
-define( 'WPCUSN_VERSION', '1.1.4' );
-define( 'WPCUSN_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
-define( 'WPCUSN_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'WPCUSN_PLUGIN_FILE', __FILE__ );
-define( 'WPCUSN_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+define('WPCUSN_VERSION', '1.1.5');
+define('WPCUSN_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('WPCUSN_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('WPCUSN_PLUGIN_FILE', __FILE__);
+define('WPCUSN_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
 /**
  * Main plugin class
  */
-class WPCUSN {
+class WPCUSN
+{
 	/**
 	 * Single instance of the plugin
 	 *
@@ -47,8 +48,9 @@ class WPCUSN {
 	 * @since 1.0.0
 	 * @return WPCUSN
 	 */
-	public static function get_instance() {
-		if ( null === self::$instance ) {
+	public static function get_instance()
+	{
+		if (null === self::$instance) {
 			self::$instance = new self();
 		}
 		return self::$instance;
@@ -59,7 +61,8 @@ class WPCUSN {
 	 *
 	 * @since 1.0.0
 	 */
-	private function __construct() {
+	private function __construct()
+	{
 		$this->init();
 	}
 
@@ -68,7 +71,8 @@ class WPCUSN {
 	 *
 	 * @since 1.0.0
 	 */
-	private function init() {
+	private function init()
+	{
 		// Load plugin update checker
 		$this->load_update_checker();
 
@@ -76,7 +80,7 @@ class WPCUSN {
 		$this->load_dependencies();
 
 		// Initialize components
-		add_action( 'plugins_loaded', array( $this, 'load_components' ) );
+		add_action('plugins_loaded', array($this, 'load_components'));
 	}
 
 	/**
@@ -84,14 +88,15 @@ class WPCUSN {
 	 *
 	 * @since 1.0.0
 	 */
-	private function load_update_checker() {
+	private function load_update_checker()
+	{
 		// Try root path first (user added plugin-update-checker-master)
 		$update_checker_path = WPCUSN_PLUGIN_DIR . 'plugin-update-checker-master/plugin-update-checker.php';
-		if ( ! file_exists( $update_checker_path ) ) {
+		if (!file_exists($update_checker_path)) {
 			// Fallback to vendor path
 			$update_checker_path = WPCUSN_PLUGIN_DIR . 'vendor/plugin-update-checker/plugin-update-checker.php';
 		}
-		if ( file_exists( $update_checker_path ) ) {
+		if (file_exists($update_checker_path)) {
 			require_once $update_checker_path;
 			// Use buildFromHeader which reads GitHub URI from plugin header automatically
 			$update_checker = \YahnisElsts\PluginUpdateChecker\v5p6\PucFactory::buildFromHeader(
@@ -109,7 +114,8 @@ class WPCUSN {
 	 *
 	 * @since 1.0.0
 	 */
-	private function load_dependencies() {
+	private function load_dependencies()
+	{
 		require_once WPCUSN_PLUGIN_DIR . 'includes/class-clickup-api.php';
 		require_once WPCUSN_PLUGIN_DIR . 'includes/class-clickup-oauth.php';
 		require_once WPCUSN_PLUGIN_DIR . 'includes/class-status-mapper.php';
@@ -124,9 +130,10 @@ class WPCUSN {
 	 *
 	 * @since 1.0.0
 	 */
-	public function load_components() {
+	public function load_components()
+	{
 		// Initialize admin
-		if ( is_admin() ) {
+		if (is_admin()) {
 			WPCUSN_Settings_Page::get_instance();
 			WPCUSN_Post_Meta_Box::get_instance();
 		}
