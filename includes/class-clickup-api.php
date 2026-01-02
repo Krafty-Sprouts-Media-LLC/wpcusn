@@ -234,6 +234,27 @@ class WPCUSN_ClickUp_API {
 	}
 
 	/**
+	 * Get teams (workspaces)
+	 *
+	 * @since 1.0.67
+	 * @return array|WP_Error
+	 */
+	public function get_teams() {
+		return $this->request( '/team' );
+	}
+
+	/**
+	 * Get spaces for a team
+	 *
+	 * @since 1.0.7
+	 * @param string $team_id Team/Workspace ID
+	 * @return array|WP_Error
+	 */
+	public function get_spaces( $team_id ) {
+		return $this->request( "/team/{$team_id}/space" );
+	}
+
+	/**
 	 * Get user info (for testing authentication)
 	 *
 	 * @since 1.0.0

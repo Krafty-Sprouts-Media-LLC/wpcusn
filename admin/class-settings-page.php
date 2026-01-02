@@ -49,6 +49,7 @@ class WPCUSN_Settings_Page {
 		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_notices', array( $this, 'show_admin_notices' ) );
+		add_action( 'wp_ajax_wpcusn_get_spaces', array( $this, 'ajax_get_spaces' ) );
 	}
 
 	/**
@@ -168,6 +169,55 @@ class WPCUSN_Settings_Page {
 	 */
 	public function render_settings_page() {
 		include WPCUSN_PLUGIN_DIR . 'admin/views/settings-page.php';
+	}
+
+	/**
+	 * AJAX handler to get spaces
+	 *
+	 * @since 1.0.7
+	 */
+	public function ajax_get_spaces() {
+		check_ajax_referer( 'wpcusn_get_spaces', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Unauthorized', 'wpcusn' ) ) );
+		}
+
+		$api = WPCUSN_ClickUp_API::get_instance();
+
+		// Get teams first
+		$teams_result = $api->get_teams();
+		if ( is_wp_error( $teams_result ) ) {
+			wp_send_json_error( array( 'message' => $teams_result->get_error_message() ) );
+		}
+
+		$all_spaces = array();
+
+		// Get spaces from all teams
+		if ( isset( $teams_result['teams'] ) && is_array( $teams_result['teams'] ) ) {
+			foreach ( $teams_result['teams'] as $team ) {
+				$team_id = $team['id'] ?? '';
+				$team_name = $team['name'] ?? '';
+
+				if ( ! $team_id ) {
+					continue;
+				}
+
+				$spaces_result = $api->get_spaces( $team_id );
+				if ( ! is_wp_error( $spaces_result ) && isset( $spaces_result['spaces'] ) && is_array( $spaces_result['spaces'] ) ) {
+					foreach ( $spaces_result['spaces'] as $space ) {
+						$all_spaces[] = array(
+							'id'       => $space['id'] ?? '',
+							'name'     => $space['name'] ?? '',
+							'team_id'  => $team_id,
+							'team_name' => $team_name,
+						);
+					}
+				}
+			}
+		}
+
+		wp_send_json_success( array( 'spaces' => $all_spaces ) );
 	}
 }
 

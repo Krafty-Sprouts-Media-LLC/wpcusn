@@ -100,14 +100,34 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 		<table class="form-table">
 			<tr>
 				<th scope="row">
-					<label for="wpcusn_space_id"><?php esc_html_e( 'Space ID', 'wpcusn' ); ?></label>
+					<label for="wpcusn_space_id"><?php esc_html_e( 'Space', 'wpcusn' ); ?></label>
 				</th>
 				<td>
 					<?php $space_id = get_option( 'wpcusn_space_id' ); ?>
-					<input type="text" id="wpcusn_space_id" name="wpcusn_space_id" value="<?php echo esc_attr( $space_id ); ?>" class="regular-text" />
-					<p class="description">
-						<?php esc_html_e( 'The ClickUp Space ID where your tasks are located. Found in the space URL: app.clickup.com/{space_id}/... The plugin will search across all lists in this space.', 'wpcusn' ); ?>
-					</p>
+					<?php if ( $is_connected ) : ?>
+						<select id="wpcusn_space_id" name="wpcusn_space_id" class="regular-text">
+							<option value=""><?php esc_html_e( '-- Select a Space --', 'wpcusn' ); ?></option>
+							<?php if ( $space_id ) : ?>
+								<option value="<?php echo esc_attr( $space_id ); ?>" selected><?php echo esc_html( $space_id ); ?> (<?php esc_html_e( 'Current', 'wpcusn' ); ?>)</option>
+							<?php endif; ?>
+						</select>
+						<button type="button" id="wpcusn-load-spaces" class="button" style="margin-left: 5px;">
+							<?php esc_html_e( 'Load Spaces', 'wpcusn' ); ?>
+						</button>
+						<span id="wpcusn-spaces-loading" style="display: none; margin-left: 10px;"><?php esc_html_e( 'Loading...', 'wpcusn' ); ?></span>
+						<p class="description">
+							<?php esc_html_e( 'Click "Load Spaces" to fetch your ClickUp spaces. The plugin will search across all lists in the selected space.', 'wpcusn' ); ?>
+						</p>
+						<input type="text" id="wpcusn_space_id_manual" name="wpcusn_space_id" value="<?php echo esc_attr( $space_id ); ?>" class="regular-text" style="display: none; margin-top: 5px;" placeholder="<?php esc_attr_e( 'Or enter Space ID manually', 'wpcusn' ); ?>" />
+						<p class="description" style="margin-top: 5px;">
+							<a href="#" id="wpcusn-toggle-manual-space" style="text-decoration: none;"><?php esc_html_e( 'Enter Space ID manually', 'wpcusn' ); ?></a>
+						</p>
+					<?php else : ?>
+						<input type="text" id="wpcusn_space_id" name="wpcusn_space_id" value="<?php echo esc_attr( $space_id ); ?>" class="regular-text" />
+						<p class="description">
+							<?php esc_html_e( 'Connect to ClickUp first to load spaces automatically, or enter the Space ID manually. Found in the space URL: app.clickup.com/{space_id}/...', 'wpcusn' ); ?>
+						</p>
+					<?php endif; ?>
 				</td>
 			</tr>
 			<tr>
