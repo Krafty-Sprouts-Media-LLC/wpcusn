@@ -5,10 +5,6 @@
  * @package WPCUSN
  * @author Krafty Sprouts Media, LLC
  * @since 1.0.0
- * @version 1.0.0
- * @last_modified 2024-01-01
- *
- * HTML template for the settings page.
  */
 
 // Exit if accessed directly
@@ -17,14 +13,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $oauth = WPCUSN_ClickUp_OAuth::get_instance();
-$api = WPCUSN_ClickUp_API::get_instance();
 $is_connected = $oauth->is_connected();
 $client_id = get_option( 'wpcusn_oauth_client_id' );
 $client_secret = get_option( 'wpcusn_oauth_client_secret' );
 $api_key = get_option( 'wpcusn_api_key' );
 $list_id = get_option( 'wpcusn_list_id' );
-$logs = get_option( 'wpcusn_sync_logs', array() );
 $webhook_url = rest_url( 'clickup/v1/webhook' );
+$logs = get_option( 'wpcusn_sync_logs', array() );
+$logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 ?>
 
 <div class="wrap">
@@ -37,16 +33,16 @@ $webhook_url = rest_url( 'clickup/v1/webhook' );
 
 		<table class="form-table">
 			<tr>
-				<th scope="row"><?php esc_html_e( 'Connection Status', 'wpcusn' ); ?></th>
+				<th scope="row"><?php esc_html_e( 'API Key (Alternative)', 'wpcusn' ); ?></th>
 				<td>
-					<?php if ( $is_connected ) : ?>
-						<span style="color: green;">✓ <?php esc_html_e( 'Connected', 'wpcusn' ); ?></span>
-						<form method="post" style="display: inline-block; margin-left: 20px;">
-							<?php wp_nonce_field( 'wpcusn_disconnect' ); ?>
-							<input type="submit" name="wpcusn_disconnect" class="button" value="<?php esc_attr_e( 'Disconnect', 'wpcusn' ); ?>" />
-						</form>
-					<?php else : ?>
-						<span style="color: red;">✗ <?php esc_html_e( 'Not Connected', 'wpcusn' ); ?></span>
+					<input type="password" id="wpcusn_api_key" name="wpcusn_api_key" value="<?php echo esc_attr( $api_key ); ?>" class="regular-text" />
+					<p class="description">
+						<?php esc_html_e( 'Get your API key from ClickUp Settings → Apps → API Token', 'wpcusn' ); ?>
+					</p>
+					<?php if ( $api_key && ! $is_connected ) : ?>
+						<p>
+							<span style="color: green;">✓ <?php esc_html_e( 'API Key configured', 'wpcusn' ); ?></span>
+						</p>
 					<?php endif; ?>
 				</td>
 			</tr>
@@ -83,16 +79,18 @@ $webhook_url = rest_url( 'clickup/v1/webhook' );
 							<?php endif; ?>
 						</p>
 					<?php endif; ?>
-				</td>
-			</tr>
-
-			<tr>
-				<th scope="row"><?php esc_html_e( 'API Key (Alternative)', 'wpcusn' ); ?></th>
-				<td>
-					<input type="text" id="wpcusn_api_key" name="wpcusn_api_key" value="<?php echo esc_attr( $api_key ); ?>" class="regular-text" />
-					<p class="description">
-						<?php esc_html_e( 'Use this if you prefer not to use OAuth2. Get your API key from ClickUp Settings → Apps → API Token.', 'wpcusn' ); ?>
-					</p>
+					<?php if ( $is_connected ) : ?>
+						<p>
+							<span style="color: green;">✓ <?php esc_html_e( 'Connected to ClickUp', 'wpcusn' ); ?></span>
+							<form method="post" action="" style="display: inline;">
+								<?php wp_nonce_field( 'wpcusn_disconnect' ); ?>
+								<input type="hidden" name="wpcusn_disconnect" value="1" />
+								<button type="submit" class="button" style="margin-left: 10px;">
+									<?php esc_html_e( 'Disconnect', 'wpcusn' ); ?>
+								</button>
+							</form>
+						</p>
+					<?php endif; ?>
 				</td>
 			</tr>
 		</table>
@@ -156,6 +154,13 @@ $webhook_url = rest_url( 'clickup/v1/webhook' );
 
 		<h2><?php esc_html_e( 'Webhook Configuration', 'wpcusn' ); ?></h2>
 
+		<?php
+		$webhook_id = get_option( 'wpcusn_webhook_id' );
+		$webhook_secret = get_option( 'wpcusn_webhook_secret' );
+		$space_id = get_option( 'wpcusn_space_id' );
+		$is_connected = WPCUSN_ClickUp_OAuth::get_instance()->is_connected();
+		?>
+
 		<table class="form-table">
 			<tr>
 				<th scope="row"><?php esc_html_e( 'Webhook URL', 'wpcusn' ); ?></th>
@@ -164,8 +169,54 @@ $webhook_url = rest_url( 'clickup/v1/webhook' );
 					<button type="button" class="button" onclick="navigator.clipboard.writeText('<?php echo esc_js( $webhook_url ); ?>'); alert('Copied!');">
 						<?php esc_html_e( 'Copy', 'wpcusn' ); ?>
 					</button>
-					<p class="description">
-						<?php esc_html_e( 'Configure this URL in ClickUp: Space Settings → Integrations → Webhooks. Event: Task Status Updated.', 'wpcusn' ); ?>
+				</td>
+			</tr>
+			<?php if ( $webhook_id ) : ?>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Webhook Status', 'wpcusn' ); ?></th>
+					<td>
+						<span style="color: green;">✓ <?php esc_html_e( 'Webhook is active', 'wpcusn' ); ?></span>
+						<p class="description">
+							<?php esc_html_e( 'Webhook ID:', 'wpcusn' ); ?> <code><?php echo esc_html( $webhook_id ); ?></code>
+						</p>
+					</td>
+				</tr>
+			<?php endif; ?>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Webhook Setup', 'wpcusn' ); ?></th>
+				<td>
+					<?php if ( $is_connected && $space_id ) : ?>
+						<?php if ( ! $webhook_id ) : ?>
+							<form method="post" action="">
+								<?php wp_nonce_field( 'wpcusn_create_webhook' ); ?>
+								<input type="hidden" name="wpcusn_action" value="create_webhook" />
+								<button type="submit" class="button button-primary">
+									<?php esc_html_e( 'Create Webhook Automatically', 'wpcusn' ); ?>
+								</button>
+								<p class="description">
+									<?php esc_html_e( 'This will create a webhook in ClickUp for "taskStatusUpdated" events in your space.', 'wpcusn' ); ?>
+								</p>
+							</form>
+						<?php else : ?>
+							<form method="post" action="">
+								<?php wp_nonce_field( 'wpcusn_delete_webhook' ); ?>
+								<input type="hidden" name="wpcusn_action" value="delete_webhook" />
+								<button type="submit" class="button" onclick="return confirm('<?php esc_attr_e( 'Are you sure you want to delete this webhook?', 'wpcusn' ); ?>');">
+									<?php esc_html_e( 'Delete Webhook', 'wpcusn' ); ?>
+								</button>
+							</form>
+						<?php endif; ?>
+					<?php else : ?>
+						<p class="description">
+							<?php esc_html_e( 'Please connect to ClickUp and configure your Space ID first.', 'wpcusn' ); ?>
+						</p>
+					<?php endif; ?>
+					<p class="description" style="margin-top: 10px;">
+						<strong><?php esc_html_e( 'Manual Setup (Alternative):', 'wpcusn' ); ?></strong><br />
+						<?php esc_html_e( 'Webhooks must be created via the ClickUp API. Use the Create Webhook endpoint with:', 'wpcusn' ); ?><br />
+						• <?php esc_html_e( 'Endpoint:', 'wpcusn' ); ?> <code><?php echo esc_url( $webhook_url ); ?></code><br />
+						• <?php esc_html_e( 'Event:', 'wpcusn' ); ?> <code>taskStatusUpdated</code><br />
+						• <?php esc_html_e( 'Space ID:', 'wpcusn' ); ?> <code><?php echo esc_html( $space_id ?: 'Your Space ID' ); ?></code>
 					</p>
 				</td>
 			</tr>
@@ -183,27 +234,51 @@ $webhook_url = rest_url( 'clickup/v1/webhook' );
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Time', 'wpcusn' ); ?></th>
-					<th><?php esc_html_e( 'Post ID', 'wpcusn' ); ?></th>
+					<th><?php esc_html_e( 'Post', 'wpcusn' ); ?></th>
+					<th><?php esc_html_e( 'Task', 'wpcusn' ); ?></th>
 					<th><?php esc_html_e( 'Direction', 'wpcusn' ); ?></th>
 					<th><?php esc_html_e( 'Status Change', 'wpcusn' ); ?></th>
 					<th><?php esc_html_e( 'Result', 'wpcusn' ); ?></th>
 				</tr>
 			</thead>
 			<tbody>
-				<?php foreach ( array_reverse( $logs ) as $log ) : ?>
+				<?php foreach ( $logs as $log ) : ?>
 					<tr>
-						<td><?php echo esc_html( $log['timestamp'] ); ?></td>
-						<td><?php echo esc_html( $log['post_id'] ); ?></td>
-						<td><?php echo esc_html( $log['direction'] ); ?></td>
+						<td><?php echo esc_html( $log['time'] ?? '' ); ?></td>
 						<td>
-							<?php echo esc_html( $log['old_status'] ); ?> → <?php echo esc_html( $log['new_status'] ); ?>
+							<?php
+							$post_id = $log['post_id'] ?? 0;
+							if ( $post_id ) {
+								$post = get_post( $post_id );
+								if ( $post ) {
+									echo '<a href="' . esc_url( get_edit_post_link( $post_id ) ) . '">' . esc_html( $post->post_title ) . '</a>';
+								} else {
+									echo esc_html( $post_id );
+								}
+							}
+							?>
+						</td>
+						<td><?php echo esc_html( $log['task_id'] ?? '' ); ?></td>
+						<td><?php echo esc_html( $log['direction'] ?? '' ); ?></td>
+						<td>
+							<?php
+							$old_status = $log['old_status'] ?? '';
+							$new_status = $log['new_status'] ?? '';
+							echo esc_html( $old_status ) . ' → ' . esc_html( $new_status );
+							?>
 						</td>
 						<td>
-							<?php if ( $log['success'] ) : ?>
-								<span style="color: green;">✓</span>
-							<?php else : ?>
-								<span style="color: red;">✗</span>
-							<?php endif; ?>
+							<?php
+							$success = $log['success'] ?? false;
+							if ( $success ) {
+								echo '<span style="color: green;">✓ ' . esc_html__( 'Success', 'wpcusn' ) . '</span>';
+							} else {
+								echo '<span style="color: red;">✗ ' . esc_html__( 'Failed', 'wpcusn' ) . '</span>';
+								if ( isset( $log['error'] ) ) {
+									echo '<br /><small>' . esc_html( $log['error'] ) . '</small>';
+								}
+							}
+							?>
 						</td>
 					</tr>
 				<?php endforeach; ?>
@@ -211,4 +286,3 @@ $webhook_url = rest_url( 'clickup/v1/webhook' );
 		</table>
 	<?php endif; ?>
 </div>
-
