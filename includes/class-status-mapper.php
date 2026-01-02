@@ -102,6 +102,11 @@ class WPCUSN_Status_Mapper
 	 */
 	public function sync_to_clickup($new_status, $old_status, $post)
 	{
+		// Check if WP → ClickUp sync is enabled
+		if (!get_option('wpcusn_sync_wp_to_clickup', true)) {
+			return;
+		}
+
 		// Only sync for posts
 		if ('post' !== $post->post_type) {
 			return;

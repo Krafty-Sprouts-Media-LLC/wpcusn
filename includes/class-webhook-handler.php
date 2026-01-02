@@ -92,6 +92,12 @@ class WPCUSN_Webhook_Handler
 	 */
 	public function handle_webhook($request)
 	{
+		// Check if ClickUp → WP sync is enabled
+		if (!get_option('wpcusn_sync_clickup_to_wp', true)) {
+			// Return success to prevent ClickUp from retrying
+			return new WP_REST_Response(array('success' => true, 'message' => 'Sync disabled'), 200);
+		}
+
 		$body = $request->get_json_params();
 
 		// Validate event type first

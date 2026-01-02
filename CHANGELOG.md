@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.8] - 02/01/2026
+
+### Changed
+- **Sync Direction Enforcement**: Settings from v1.2.7 are now fully enforced
+  - WordPress → ClickUp: Checked before syncing post status changes
+  - ClickUp → WordPress: Checked before processing webhook events
+  - Webhooks return success (200) when sync is disabled to prevent ClickUp retries
+
+### Note
+- You can now disable ClickUp → WordPress sync to prevent webhook processing entirely
+- Both sync directions default to ON for backward compatibility
+
 ## [1.2.7] - 02/01/2026
 
 ### Added
