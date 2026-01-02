@@ -306,3 +306,76 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 		</table>
 	<?php endif; ?>
 </div>
+
+<?php if ( $is_connected ) : ?>
+<script>
+jQuery(document).ready(function($) {
+	var loadingSpaces = false;
+
+	$('#wpcusn-load-spaces').on('click', function() {
+		if (loadingSpaces) return;
+		
+		var button = $(this);
+		var select = $('#wpcusn_space_id');
+		var loading = $('#wpcusn-spaces-loading');
+		
+		button.prop('disabled', true);
+		loading.show();
+		loadingSpaces = true;
+		
+		$.ajax({
+			url: ajaxurl,
+			type: 'POST',
+			data: {
+				action: 'wpcusn_get_spaces',
+				nonce: '<?php echo esc_js( wp_create_nonce( 'wpcusn_get_spaces' ) ); ?>'
+			},
+			success: function(response) {
+				if (response.success && response.data.spaces) {
+					// Clear existing options except the first one
+					select.find('option:not(:first)').remove();
+					
+					// Add spaces
+					$.each(response.data.spaces, function(i, space) {
+						var selected = space.id === '<?php echo esc_js( $space_id ); ?>' ? ' selected' : '';
+						var label = space.name + ' (' + space.team_name + ') - ID: ' + space.id;
+						select.append('<option value="' + space.id + '"' + selected + '>' + label + '</option>');
+					});
+					
+					if (response.data.spaces.length === 0) {
+						select.append('<option value=""><?php esc_html_e( 'No spaces found', 'wpcusn' ); ?></option>');
+					}
+				} else {
+					alert(response.data.message || '<?php esc_html_e( 'Failed to load spaces', 'wpcusn' ); ?>');
+				}
+			},
+			error: function() {
+				alert('<?php esc_html_e( 'Error loading spaces', 'wpcusn' ); ?>');
+			},
+			complete: function() {
+				button.prop('disabled', false);
+				loading.hide();
+				loadingSpaces = false;
+			}
+		});
+	});
+
+	$('#wpcusn-toggle-manual-space').on('click', function(e) {
+		e.preventDefault();
+		var select = $('#wpcusn_space_id');
+		var manual = $('#wpcusn_space_id_manual');
+		var link = $(this);
+		
+		if (manual.is(':visible')) {
+			manual.hide();
+			select.show();
+			link.text('<?php esc_html_e( 'Enter Space ID manually', 'wpcusn' ); ?>');
+		} else {
+			select.hide();
+			manual.show();
+			link.text('<?php esc_html_e( 'Use dropdown instead', 'wpcusn' ); ?>');
+		}
+	});
+});
+</script>
+<?php endif; ?>
