@@ -246,7 +246,7 @@ class WPCUSN_ClickUp_API {
 	/**
 	 * Create webhook
 	 *
-	 * @since 1.0.5
+	 * @since 1.0.6
 	 * @param string $webhook_url The URL to receive webhook events
 	 * @param string $space_id Space ID to subscribe to
 	 * @param string $list_id Optional list ID to limit to specific list
@@ -271,7 +271,7 @@ class WPCUSN_ClickUp_API {
 	/**
 	 * Get webhooks
 	 *
-	 * @since 1.0.5
+	 * @since 1.0.6
 	 * @param string $team_id Team/Workspace ID
 	 * @return array|WP_Error
 	 */
@@ -282,7 +282,7 @@ class WPCUSN_ClickUp_API {
 	/**
 	 * Delete webhook
 	 *
-	 * @since 1.0.5
+	 * @since 1.0.6
 	 * @param string $webhook_id Webhook ID
 	 * @return array|WP_Error
 	 */
