@@ -236,7 +236,7 @@ class WPCUSN_ClickUp_API {
 	/**
 	 * Get teams (workspaces)
 	 *
-	 * @since 1.0.67
+	 * @since 1.0.7
 	 * @return array|WP_Error
 	 */
 	public function get_teams() {
