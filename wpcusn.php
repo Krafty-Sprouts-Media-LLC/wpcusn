@@ -8,8 +8,8 @@
  * Author URI: https://animalofthings.com
  * GitHub URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
  * Text Domain: wpcusn
- * Requires at least: 5.0
- * Requires PHP: 7.4
+ * Requires at least: 6.8
+ * Requires PHP: 8.0
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  *
