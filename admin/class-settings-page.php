@@ -48,6 +48,7 @@ class WPCUSN_Settings_Page {
 	private function __construct() {
 		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'admin_init', array( $this, 'handle_settings_save' ), 999 );
 		add_action( 'admin_notices', array( $this, 'show_admin_notices' ) );
 		add_action( 'wp_ajax_wpcusn_get_spaces', array( $this, 'ajax_get_spaces' ) );
 		add_action( 'admin_post_wpcusn_disconnect', array( $this, 'handle_disconnect' ) );
@@ -146,10 +147,14 @@ class WPCUSN_Settings_Page {
 	 */
 	public function redirect_after_save( $location, $status ) {
 		// Only redirect if we're coming from our settings page
+		// Check if this is our settings form submission
 		if ( isset( $_POST['option_page'] ) && 'wpcusn_settings' === $_POST['option_page'] ) {
-			if ( strpos( $location, 'options.php' ) !== false ) {
-				$location = admin_url( 'options-general.php?page=wpcusn&settings-updated=1' );
-			}
+			// Always redirect back to our settings page
+			$location = admin_url( 'options-general.php?page=wpcusn&settings-updated=1' );
+		}
+		// Also check if location contains options.php and we're on our page
+		elseif ( strpos( $location, 'options.php' ) !== false && isset( $_GET['page'] ) && 'wpcusn' === $_GET['page'] ) {
+			$location = admin_url( 'options-general.php?page=wpcusn&settings-updated=1' );
 		}
 		return $location;
 	}
