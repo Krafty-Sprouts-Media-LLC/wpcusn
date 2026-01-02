@@ -12,14 +12,15 @@
  */
 
 // Exit if accessed directly
-if ( ! defined( 'ABSPATH' ) ) {
+if (!defined('ABSPATH')) {
 	exit;
 }
 
 /**
  * Status Mapper Class
  */
-class WPCUSN_Status_Mapper {
+class WPCUSN_Status_Mapper
+{
 	/**
 	 * Single instance
 	 *
@@ -33,8 +34,9 @@ class WPCUSN_Status_Mapper {
 	 * @since 1.0.0
 	 * @return WPCUSN_Status_Mapper
 	 */
-	public static function get_instance() {
-		if ( null === self::$instance ) {
+	public static function get_instance()
+	{
+		if (null === self::$instance) {
 			self::$instance = new self();
 		}
 		return self::$instance;
@@ -45,8 +47,9 @@ class WPCUSN_Status_Mapper {
 	 *
 	 * @since 1.0.0
 	 */
-	private function __construct() {
-		add_action( 'transition_post_status', array( $this, 'sync_to_clickup' ), 10, 3 );
+	private function __construct()
+	{
+		add_action('transition_post_status', array($this, 'sync_to_clickup'), 10, 3);
 	}
 
 	/**
@@ -56,16 +59,17 @@ class WPCUSN_Status_Mapper {
 	 * @param string $wp_status WordPress post status
 	 * @return string ClickUp status name
 	 */
-	public function wp_to_clickup( $wp_status ) {
+	public function wp_to_clickup($wp_status)
+	{
 		$mapping = array(
-			'draft'       => 'IN PROGRESS',
-			'ready'       => 'READY',
+			'draft' => 'IN PROGRESS',
+			'ready' => 'READY',
 			'schedulable' => 'PENDING',
-			'scheduled'   => 'PENDING',
-			'publish'     => 'PUBLISHED',
+			'scheduled' => 'PENDING',
+			'publish' => 'PUBLISHED',
 		);
 
-		return isset( $mapping[ $wp_status ] ) ? $mapping[ $wp_status ] : '';
+		return isset($mapping[$wp_status]) ? $mapping[$wp_status] : '';
 	}
 
 	/**
@@ -75,16 +79,17 @@ class WPCUSN_Status_Mapper {
 	 * @param string $clickup_status ClickUp status name
 	 * @return string WordPress post status
 	 */
-	public function clickup_to_wp( $clickup_status ) {
+	public function clickup_to_wp($clickup_status)
+	{
 		$mapping = array(
-			'TO DO'      => 'draft',
+			'TO DO' => 'draft',
 			'IN PROGRESS' => 'draft',
-			'READY'      => 'ready',
-			'PENDING'    => 'schedulable',
-			'PUBLISHED'  => 'publish',
+			'READY' => 'ready',
+			'PENDING' => 'schedulable',
+			'PUBLISHED' => 'publish',
 		);
 
-		return isset( $mapping[ $clickup_status ] ) ? $mapping[ $clickup_status ] : 'draft';
+		return isset($mapping[$clickup_status]) ? $mapping[$clickup_status] : 'draft';
 	}
 
 	/**
@@ -95,96 +100,97 @@ class WPCUSN_Status_Mapper {
 	 * @param string  $old_status Old post status
 	 * @param WP_Post $post Post object
 	 */
-	public function sync_to_clickup( $new_status, $old_status, $post ) {
+	public function sync_to_clickup($new_status, $old_status, $post)
+	{
 		// Only sync for posts
-		if ( 'post' !== $post->post_type ) {
+		if ('post' !== $post->post_type) {
 			return;
 		}
 
 		// Skip if status hasn't changed
-		if ( $new_status === $old_status ) {
+		if ($new_status === $old_status) {
 			return;
 		}
 
 		// Get task ID
-		$task_id = get_post_meta( $post->ID, '_clickup_task_id', true );
-		if ( ! $task_id ) {
+		$task_id = get_post_meta($post->ID, '_clickup_task_id', true);
+		if (!$task_id) {
 			// Log sync failure - no task linked
-			$this->log_sync( $post->ID, '', 'wp_to_clickup', $old_status, $new_status, false );
-			error_log( "[WPCUSN] Sync failed for post {$post->ID}: No ClickUp task linked. Post slug: " . ( $post->post_name ?: 'no slug' ) );
+			$this->log_sync($post->ID, '', 'wp_to_clickup', $old_status, $new_status, false);
+			error_log("[WPCUSN] Sync failed for post {$post->ID}: No ClickUp task linked. Post slug: " . ($post->post_name ?: 'no slug'));
 			return;
 		}
 
 		// Get ClickUp status
-		$clickup_status = $this->wp_to_clickup( $new_status );
-		if ( ! $clickup_status ) {
+		$clickup_status = $this->wp_to_clickup($new_status);
+		if (!$clickup_status) {
 			// Log sync failure - status not mapped
-			$this->log_sync( $post->ID, $task_id, 'wp_to_clickup', $old_status, $new_status, false );
-			error_log( "[WPCUSN] Sync failed for post {$post->ID}: WordPress status '{$new_status}' has no ClickUp mapping." );
+			$this->log_sync($post->ID, $task_id, 'wp_to_clickup', $old_status, $new_status, false);
+			error_log("[WPCUSN] Sync failed for post {$post->ID}: WordPress status '{$new_status}' has no ClickUp mapping.");
 			return;
 		}
 
 		// Get list ID automatically from task (no need to configure in settings)
 		$api = WPCUSN_ClickUp_API::get_instance();
-		
+
 		// Try stored list ID first
-		$list_id = get_post_meta( $post->ID, '_clickup_list_id', true );
-		
+		$list_id = get_post_meta($post->ID, '_clickup_list_id', true);
+
 		// If not stored, get it from the task
-		if ( ! $list_id ) {
-			$task = $api->get_task( $task_id );
-			if ( ! is_wp_error( $task ) && isset( $task['list']['id'] ) ) {
+		if (!$list_id) {
+			$task = $api->get_task($task_id);
+			if (!is_wp_error($task) && isset($task['list']['id'])) {
 				$list_id = $task['list']['id'];
 				// Store for future use
-				update_post_meta( $post->ID, '_clickup_list_id', $list_id );
+				update_post_meta($post->ID, '_clickup_list_id', $list_id);
 			}
 		}
-		
+
 		// If still no list ID, fallback to settings (for backward compatibility)
-		if ( ! $list_id ) {
-			$list_id = get_option( 'wpcusn_list_id' );
+		if (!$list_id) {
+			$list_id = get_option('wpcusn_list_id');
 		}
-		
-		if ( ! $list_id ) {
+
+		if (!$list_id) {
 			return;
 		}
 
-		// Get status ID from ClickUp
-		$status_id = $this->get_status_id( $list_id, $clickup_status );
-		if ( ! $status_id ) {
-			// Log sync failure - status ID not found
-			$this->log_sync( $post->ID, $task_id, 'wp_to_clickup', $old_status, $new_status, false );
-			error_log( "[WPCUSN] Sync failed for post {$post->ID}: ClickUp status '{$clickup_status}' not found in list {$list_id}." );
+		// Verify the status exists in the list (optional validation)
+		if (!$this->status_exists_in_list($list_id, $clickup_status)) {
+			// Log sync failure - status not found in list
+			$this->log_sync($post->ID, $task_id, 'wp_to_clickup', $old_status, $new_status, false);
+			error_log("[WPCUSN] Sync failed for post {$post->ID}: ClickUp status '{$clickup_status}' not found in list {$list_id}.");
 			return;
 		}
 
-		// Update task status
+		// Update task status - ClickUp API expects the status NAME, not ID
 		$api = WPCUSN_ClickUp_API::get_instance();
-		$result = $api->update_task_status( $task_id, $status_id );
+		$result = $api->update_task_status($task_id, $clickup_status);
 
 		// Log sync
-		$this->log_sync( $post->ID, $task_id, 'wp_to_clickup', $old_status, $new_status, ! is_wp_error( $result ) );
+		$this->log_sync($post->ID, $task_id, 'wp_to_clickup', $old_status, $new_status, !is_wp_error($result));
 	}
 
 	/**
-	 * Get status ID from ClickUp list
+	 * Check if a status exists in a ClickUp list
 	 *
 	 * @since 1.0.0
 	 * @param string $list_id List ID
 	 * @param string $status_name Status name
-	 * @return string|false Status ID
+	 * @return bool True if status exists
 	 */
-	private function get_status_id( $list_id, $status_name ) {
+	private function status_exists_in_list($list_id, $status_name)
+	{
 		$api = WPCUSN_ClickUp_API::get_instance();
-		$list = $api->get_list( $list_id );
+		$list = $api->get_list($list_id);
 
-		if ( is_wp_error( $list ) || ! isset( $list['statuses'] ) ) {
+		if (is_wp_error($list) || !isset($list['statuses'])) {
 			return false;
 		}
 
-		foreach ( $list['statuses'] as $status ) {
-			if ( $status['status'] === $status_name ) {
-				return $status['id'];
+		foreach ($list['statuses'] as $status) {
+			if (strtoupper($status['status']) === strtoupper($status_name)) {
+				return true;
 			}
 		}
 
@@ -202,25 +208,26 @@ class WPCUSN_Status_Mapper {
 	 * @param string $new_status New status
 	 * @param bool   $success Whether sync was successful
 	 */
-	private function log_sync( $post_id, $task_id, $direction, $old_status, $new_status, $success ) {
+	private function log_sync($post_id, $task_id, $direction, $old_status, $new_status, $success)
+	{
 		// Store in option for now (will move to DB table in Phase 6)
-		$logs = get_option( 'wpcusn_sync_logs', array() );
+		$logs = get_option('wpcusn_sync_logs', array());
 		$logs[] = array(
-			'post_id'    => $post_id,
-			'task_id'    => $task_id,
-			'direction'  => $direction,
+			'post_id' => $post_id,
+			'task_id' => $task_id,
+			'direction' => $direction,
 			'old_status' => $old_status,
 			'new_status' => $new_status,
-			'success'    => $success,
-			'timestamp'  => current_time( 'mysql' ),
+			'success' => $success,
+			'timestamp' => current_time('mysql'),
 		);
 
 		// Keep only last 50 logs
-		if ( count( $logs ) > 50 ) {
-			$logs = array_slice( $logs, -50 );
+		if (count($logs) > 50) {
+			$logs = array_slice($logs, -50);
 		}
 
-		update_option( 'wpcusn_sync_logs', $logs );
+		update_option('wpcusn_sync_logs', $logs);
 	}
 }
 
