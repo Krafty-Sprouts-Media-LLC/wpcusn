@@ -262,7 +262,7 @@ class WPCUSN_ClickUp_API
 	{
 		$all_tasks = array();
 		$page = 0;
-		$max_pages = 10; // Safety limit
+		$max_pages = 50; // Increased to handle 5000+ tasks
 
 		// Log the search attempt
 		$this->log_api_debug("Team search starting: team_id={$team_id}, space_id={$space_id}, looking for: '{$task_name}'");
@@ -297,8 +297,8 @@ class WPCUSN_ClickUp_API
 		$total_count = count($all_tasks);
 		$this->log_api_debug("Team search complete: total {$total_count} tasks found across {$page} page(s)");
 
-		// Filter tasks by case-insensitive name match
-		$filtered = $this->filter_tasks_by_name($all_tasks, $task_name);
+		// Filter tasks by case-insensitive name match (with fuzzy fallback)
+		$filtered = $this->filter_tasks_by_name($all_tasks, $task_name, true);
 		$match_count = isset($filtered['tasks']) ? count($filtered['tasks']) : 0;
 		$this->log_api_debug("Team search filter result: {$match_count} task(s) matched '{$task_name}'");
 
@@ -411,19 +411,61 @@ class WPCUSN_ClickUp_API
 	 * @since 1.2.1
 	 * @param array  $tasks Array of task objects
 	 * @param string $task_name Task name to match
+	 * @param bool   $fuzzy_fallback If true, return partial matches when no exact match found
 	 * @return array Filtered array with 'tasks' key
 	 */
-	private function filter_tasks_by_name($tasks, $task_name)
+	private function filter_tasks_by_name($tasks, $task_name, $fuzzy_fallback = false)
 	{
 		$filtered = array();
+		$partial_match_tasks = array();
+		$partial_match_names = array();
+		$search_lower = strtolower(trim($task_name));
+
+		// Sample first 5 task names for debugging
+		$samples = array();
+		$count = 0;
+
 		foreach ($tasks as $task) {
 			if (isset($task['name'])) {
-				// Case-insensitive match
-				if (strcasecmp($task['name'], $task_name) === 0) {
+				$task_lower = strtolower(trim($task['name']));
+
+				// Collect samples (first 5)
+				if ($count < 5) {
+					$samples[] = $task['name'];
+					$count++;
+				}
+
+				// Exact match (case-insensitive, trimmed)
+				if ($task_lower === $search_lower) {
 					$filtered[] = $task;
+				}
+				// Partial match - task name contains search term
+				elseif (strpos($task_lower, $search_lower) !== false) {
+					$partial_match_tasks[] = $task;
+					$partial_match_names[] = $task['name'];
+				}
+				// Partial match - search term contains task name
+				elseif (strpos($search_lower, $task_lower) !== false) {
+					$partial_match_tasks[] = $task;
+					$partial_match_names[] = $task['name'];
 				}
 			}
 		}
+
+		// Log samples if no exact match found
+		if (empty($filtered)) {
+			$this->log_api_debug("Sample task names from API: " . implode(' | ', $samples));
+			if (!empty($partial_match_names)) {
+				$this->log_api_debug("Partial matches found: " . implode(' | ', array_slice($partial_match_names, 0, 5)));
+			}
+
+			// Fuzzy fallback: if no exact match but have partial matches, use them
+			if ($fuzzy_fallback && !empty($partial_match_tasks)) {
+				$this->log_api_debug("Using fuzzy match fallback: returning " . count($partial_match_tasks) . " partial match(es)");
+				return array('tasks' => $partial_match_tasks);
+			}
+		}
+
 		return array('tasks' => $filtered);
 	}
 

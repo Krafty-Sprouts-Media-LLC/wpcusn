@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 02/01/2026
+
+### Fixed
+- **Critical:** Increased max page limit from 10 to 50 (now handles 5000+ tasks instead of 1000)
+- **Added fuzzy matching fallback:** If exact match fails but partial matches exist (task name contains search term or vice versa), the plugin will now use partial matches
+- Enhanced debug logging shows sample task names from API and any partial matches found
+- Added trimming to task name comparison to handle whitespace differences
+
 ## [1.2.1] - 02/01/2026
 
 ### Fixed
