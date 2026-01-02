@@ -149,11 +149,14 @@ class WPCUSN_Settings_Page {
 		// Check if this is our settings form submission
 		if ( isset( $_POST['option_page'] ) && 'wpcusn_settings' === $_POST['option_page'] ) {
 			// Always redirect back to our settings page
-			$location = admin_url( 'options-general.php?page=wpcusn&settings-updated=1' );
+			return admin_url( 'options-general.php?page=wpcusn&settings-updated=1' );
 		}
-		// Also check if location contains options.php and we're on our page
-		elseif ( strpos( $location, 'options.php' ) !== false && isset( $_GET['page'] ) && 'wpcusn' === $_GET['page'] ) {
-			$location = admin_url( 'options-general.php?page=wpcusn&settings-updated=1' );
+		// Also check if location contains options.php (WordPress default redirect)
+		if ( strpos( $location, 'options.php' ) !== false ) {
+			// Check if we have our option_page in POST (means we just saved)
+			if ( isset( $_POST['option_page'] ) && 'wpcusn_settings' === $_POST['option_page'] ) {
+				return admin_url( 'options-general.php?page=wpcusn&settings-updated=1' );
+			}
 		}
 		return $location;
 	}
