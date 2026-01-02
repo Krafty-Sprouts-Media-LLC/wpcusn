@@ -216,11 +216,14 @@ class WPCUSN_ClickUp_API {
 			}
 		}
 
-		// Filter tasks by exact name match
+		// Filter tasks by case-insensitive name match
 		$filtered = array();
 		foreach ( $all_tasks as $task ) {
-			if ( isset( $task['name'] ) && $task['name'] === $task_name ) {
-				$filtered[] = $task;
+			if ( isset( $task['name'] ) ) {
+				// Case-insensitive match
+				if ( strcasecmp( $task['name'], $task_name ) === 0 ) {
+					$filtered[] = $task;
+				}
 			}
 		}
 

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 02/01/2026
+
+### Added
+- Auto-run auto-linking on post edit page load - automatically attempts to link posts when viewing existing drafts
+- Comprehensive production logging - sync log now acts as a complete log book for production debugging (replaces debug logs)
+- Webhook event logging - all webhook received events and errors are now logged in sync log
+- Enhanced sync log display - improved formatting with event types, better error messages, and detailed information
+- Manual linking options in post meta box - "Try Auto-Link Now" button and manual Task ID input for easier debugging
+
+### Changed
+- Updated all @since tags to 1.2.0 for new features and methods
+- Sync log now shows all plugin activity including auto-linking attempts, webhook events, and API errors
+- Improved sync log table with event type column and better formatting for different event types
+
+### Fixed
+- Case-insensitive task matching in ClickUp API search to align with slug-to-title conversion
+- Auto-linking logging now includes detailed failure reasons and search parameters
+- Sync failures now properly logged with reasons (missing task ID, status mapping, list ID, etc.)
+
 ## [1.1.9] - 02/01/2026
 
 ### Fixed

@@ -103,20 +103,25 @@ class WPCUSN_Task_Linker {
 		// Convert slug to task name
 		$task_name = $this->slug_to_title( $slug );
 
+		// Log auto-linking attempt
+		$this->log_auto_link_attempt( $post_id, $slug, $task_name, $space_id, $list_id );
+
 		// Search for task in ClickUp
 		$api = WPCUSN_ClickUp_API::get_instance();
 		$result = $api->search_tasks( $space_id ?: $list_id, $task_name, $list_id );
 
 		if ( is_wp_error( $result ) ) {
+			$this->log_auto_link_failure( $post_id, $slug, $task_name, 'API Error: ' . $result->get_error_message() );
 			return;
 		}
 
 		// Find exact match (case-insensitive)
+		$matched = false;
 		if ( isset( $result['tasks'] ) && is_array( $result['tasks'] ) ) {
 			foreach ( $result['tasks'] as $task ) {
-				// Match task name (case-insensitive) or exact match
+				// Match task name (case-insensitive)
 				$task_name_match = isset( $task['name'] ) ? $task['name'] : '';
-				if ( strcasecmp( $task_name_match, $task_name ) === 0 || $task_name_match === $task_name ) {
+				if ( strcasecmp( $task_name_match, $task_name ) === 0 ) {
 					// Store task ID and list ID
 					update_post_meta( $post_id, '_clickup_task_id', $task['id'] );
 					update_post_meta( $post_id, '_clickup_task_name', $task['name'] );
@@ -125,11 +130,30 @@ class WPCUSN_Task_Linker {
 					}
 					update_post_meta( $post_id, '_clickup_linked_at', current_time( 'mysql' ) );
 
+					// Log successful link
+					$this->log_auto_link_success( $post_id, $slug, $task['id'], $task['name'] );
+
 					// Add admin notice
 					set_transient( 'wpcusn_linked_' . $post_id, true, 30 );
+					$matched = true;
 					break;
 				}
 			}
+		}
+
+		// Log if no match found
+		if ( ! $matched ) {
+			$task_count = isset( $result['tasks'] ) ? count( $result['tasks'] ) : 0;
+			$found_names = array();
+			if ( isset( $result['tasks'] ) && is_array( $result['tasks'] ) ) {
+				foreach ( $result['tasks'] as $task ) {
+					if ( isset( $task['name'] ) ) {
+						$found_names[] = $task['name'];
+					}
+				}
+			}
+			$found_list = ! empty( $found_names ) ? " Found tasks: " . implode( ', ', array_slice( $found_names, 0, 5 ) ) . ( count( $found_names ) > 5 ? '...' : '' ) : '';
+			$this->log_auto_link_failure( $post_id, $slug, $task_name, "No matching task found. Searched for: '{$task_name}' (from slug: '{$slug}'). Found {$task_count} tasks but none matched case-insensitively.{$found_list}" );
 		}
 	}
 
@@ -163,9 +187,117 @@ class WPCUSN_Task_Linker {
 	 * @param int $post_id Post ID
 	 */
 	public function unlink_task( $post_id ) {
+		$task_id = get_post_meta( $post_id, '_clickup_task_id', true );
 		delete_post_meta( $post_id, '_clickup_task_id' );
 		delete_post_meta( $post_id, '_clickup_task_name' );
 		delete_post_meta( $post_id, '_clickup_linked_at' );
+		delete_post_meta( $post_id, '_clickup_list_id' );
+		
+		// Log unlink
+		$this->log_auto_link_unlink( $post_id, $task_id );
+	}
+
+	/**
+	 * Log auto-linking attempt
+	 *
+	 * @since 1.2.0
+	 * @param int    $post_id Post ID
+	 * @param string $slug Post slug
+	 * @param string $task_name Task name being searched
+	 * @param string $space_id Space ID
+	 * @param string $list_id List ID
+	 */
+	private function log_auto_link_attempt( $post_id, $slug, $task_name, $space_id, $list_id ) {
+		$logs = get_option( 'wpcusn_sync_logs', array() );
+		$logs[] = array(
+			'post_id'    => $post_id,
+			'task_id'    => '',
+			'direction'  => 'auto_link_attempt',
+			'old_status' => "Slug: {$slug}",
+			'new_status' => "Searching: '{$task_name}' (Space: {$space_id}, List: " . ( $list_id ?: 'none' ) . ")",
+			'success'    => null,
+			'timestamp'  => current_time( 'mysql' ),
+		);
+		if ( count( $logs ) > 50 ) {
+			$logs = array_slice( $logs, -50 );
+		}
+		update_option( 'wpcusn_sync_logs', $logs );
+	}
+
+	/**
+	 * Log successful auto-link
+	 *
+	 * @since 1.2.0
+	 * @param int    $post_id Post ID
+	 * @param string $slug Post slug
+	 * @param string $task_id Task ID
+	 * @param string $task_name Task name
+	 */
+	private function log_auto_link_success( $post_id, $slug, $task_id, $task_name ) {
+		$logs = get_option( 'wpcusn_sync_logs', array() );
+		$logs[] = array(
+			'post_id'    => $post_id,
+			'task_id'    => $task_id,
+			'direction'  => 'auto_link_success',
+			'old_status' => "Slug: {$slug}",
+			'new_status' => "Linked to: '{$task_name}' ({$task_id})",
+			'success'    => true,
+			'timestamp'  => current_time( 'mysql' ),
+		);
+		if ( count( $logs ) > 50 ) {
+			$logs = array_slice( $logs, -50 );
+		}
+		update_option( 'wpcusn_sync_logs', $logs );
+	}
+
+	/**
+	 * Log auto-linking failure
+	 *
+	 * @since 1.2.0
+	 * @param int    $post_id Post ID
+	 * @param string $slug Post slug
+	 * @param string $task_name Task name searched
+	 * @param string $reason Failure reason
+	 */
+	private function log_auto_link_failure( $post_id, $slug, $task_name, $reason ) {
+		$logs = get_option( 'wpcusn_sync_logs', array() );
+		$logs[] = array(
+			'post_id'    => $post_id,
+			'task_id'    => '',
+			'direction'  => 'auto_link_failed',
+			'old_status' => "Slug: {$slug}, Searched: '{$task_name}'",
+			'new_status' => "Failed: {$reason}",
+			'success'    => false,
+			'timestamp'  => current_time( 'mysql' ),
+		);
+		if ( count( $logs ) > 50 ) {
+			$logs = array_slice( $logs, -50 );
+		}
+		update_option( 'wpcusn_sync_logs', $logs );
+	}
+
+	/**
+	 * Log task unlink
+	 *
+	 * @since 1.2.0
+	 * @param int    $post_id Post ID
+	 * @param string $task_id Task ID that was unlinked
+	 */
+	private function log_auto_link_unlink( $post_id, $task_id ) {
+		$logs = get_option( 'wpcusn_sync_logs', array() );
+		$logs[] = array(
+			'post_id'    => $post_id,
+			'task_id'    => $task_id,
+			'direction'  => 'task_unlinked',
+			'old_status' => "Task ID: {$task_id}",
+			'new_status' => 'Unlinked',
+			'success'    => true,
+			'timestamp'  => current_time( 'mysql' ),
+		);
+		if ( count( $logs ) > 50 ) {
+			$logs = array_slice( $logs, -50 );
+		}
+		update_option( 'wpcusn_sync_logs', $logs );
 	}
 }
 

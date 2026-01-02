@@ -109,12 +109,18 @@ class WPCUSN_Status_Mapper {
 		// Get task ID
 		$task_id = get_post_meta( $post->ID, '_clickup_task_id', true );
 		if ( ! $task_id ) {
+			// Log sync failure - no task linked
+			$this->log_sync( $post->ID, '', 'wp_to_clickup', $old_status, $new_status, false );
+			error_log( "[WPCUSN] Sync failed for post {$post->ID}: No ClickUp task linked. Post slug: " . ( $post->post_name ?: 'no slug' ) );
 			return;
 		}
 
 		// Get ClickUp status
 		$clickup_status = $this->wp_to_clickup( $new_status );
 		if ( ! $clickup_status ) {
+			// Log sync failure - status not mapped
+			$this->log_sync( $post->ID, $task_id, 'wp_to_clickup', $old_status, $new_status, false );
+			error_log( "[WPCUSN] Sync failed for post {$post->ID}: WordPress status '{$new_status}' has no ClickUp mapping." );
 			return;
 		}
 
@@ -146,6 +152,9 @@ class WPCUSN_Status_Mapper {
 		// Get status ID from ClickUp
 		$status_id = $this->get_status_id( $list_id, $clickup_status );
 		if ( ! $status_id ) {
+			// Log sync failure - status ID not found
+			$this->log_sync( $post->ID, $task_id, 'wp_to_clickup', $old_status, $new_status, false );
+			error_log( "[WPCUSN] Sync failed for post {$post->ID}: ClickUp status '{$clickup_status}' not found in list {$list_id}." );
 			return;
 		}
 

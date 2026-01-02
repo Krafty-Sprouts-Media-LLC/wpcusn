@@ -5,7 +5,7 @@
  * @package WPCUSN
  * @author Krafty Sprouts Media, LLC
  * @since 1.0.0
- * @version 1.1.9
+ * @version 1.2.0
  * @last_modified 02/01/2026
  *
  * Handles the admin settings page for the plugin.

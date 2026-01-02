@@ -247,6 +247,9 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 	<?php endif; ?>
 
 	<h2><?php esc_html_e( 'Sync Logs', 'wpcusn' ); ?></h2>
+	<p class="description">
+		<?php esc_html_e( 'Production log book: All plugin activity is logged here for debugging. This replaces debug logs in production environments.', 'wpcusn' ); ?>
+	</p>
 
 	<?php if ( empty( $logs ) ) : ?>
 		<p><?php esc_html_e( 'No sync events yet.', 'wpcusn' ); ?></p>
@@ -255,48 +258,128 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Time', 'wpcusn' ); ?></th>
+					<th><?php esc_html_e( 'Event Type', 'wpcusn' ); ?></th>
 					<th><?php esc_html_e( 'Post', 'wpcusn' ); ?></th>
 					<th><?php esc_html_e( 'Task', 'wpcusn' ); ?></th>
-					<th><?php esc_html_e( 'Direction', 'wpcusn' ); ?></th>
-					<th><?php esc_html_e( 'Status Change', 'wpcusn' ); ?></th>
+					<th><?php esc_html_e( 'Details', 'wpcusn' ); ?></th>
 					<th><?php esc_html_e( 'Result', 'wpcusn' ); ?></th>
 				</tr>
 			</thead>
 			<tbody>
 				<?php foreach ( $logs as $log ) : ?>
+					<?php
+					$timestamp = $log['timestamp'] ?? $log['time'] ?? '';
+					$direction = $log['direction'] ?? '';
+					$post_id = $log['post_id'] ?? 0;
+					$task_id = $log['task_id'] ?? '';
+					$old_status = $log['old_status'] ?? '';
+					$new_status = $log['new_status'] ?? '';
+					$success = $log['success'] ?? null;
+					$error = $log['error'] ?? '';
+
+					// Format event type for display
+					$event_type_labels = array(
+						'auto_link_attempt' => __( 'Auto-Link Attempt', 'wpcusn' ),
+						'auto_link_success' => __( 'Auto-Link Success', 'wpcusn' ),
+						'auto_link_failed'  => __( 'Auto-Link Failed', 'wpcusn' ),
+						'task_unlinked'     => __( 'Task Unlinked', 'wpcusn' ),
+						'wp_to_clickup'     => __( 'WP → ClickUp Sync', 'wpcusn' ),
+						'clickup_to_wp'     => __( 'ClickUp → WP Sync', 'wpcusn' ),
+						'webhook_received'  => __( 'Webhook Received', 'wpcusn' ),
+						'webhook_error'     => __( 'Webhook Error', 'wpcusn' ),
+					);
+					$event_label = $event_type_labels[ $direction ] ?? $direction;
+					?>
 					<tr>
-						<td><?php echo esc_html( $log['time'] ?? '' ); ?></td>
 						<td>
 							<?php
-							$post_id = $log['post_id'] ?? 0;
-							if ( $post_id ) {
-								$post = get_post( $post_id );
-								if ( $post ) {
-									echo '<a href="' . esc_url( get_edit_post_link( $post_id ) ) . '">' . esc_html( $post->post_title ) . '</a>';
+							if ( $timestamp ) {
+								$time = strtotime( $timestamp );
+								if ( $time ) {
+									echo esc_html( date_i18n( 'Y-m-d H:i:s', $time ) );
 								} else {
-									echo esc_html( $post_id );
+									echo esc_html( $timestamp );
 								}
 							}
 							?>
 						</td>
-						<td><?php echo esc_html( $log['task_id'] ?? '' ); ?></td>
-						<td><?php echo esc_html( $log['direction'] ?? '' ); ?></td>
+						<td>
+							<strong><?php echo esc_html( $event_label ); ?></strong>
+						</td>
 						<td>
 							<?php
-							$old_status = $log['old_status'] ?? '';
-							$new_status = $log['new_status'] ?? '';
-							echo esc_html( $old_status ) . ' → ' . esc_html( $new_status );
+							if ( $post_id ) {
+								$post = get_post( $post_id );
+								if ( $post ) {
+									echo '<a href="' . esc_url( get_edit_post_link( $post_id ) ) . '">' . esc_html( $post->post_title ) . '</a>';
+									echo '<br /><small>ID: ' . esc_html( $post_id ) . '</small>';
+								} else {
+									echo esc_html( $post_id );
+								}
+							} else {
+								echo '—';
+							}
 							?>
 						</td>
 						<td>
 							<?php
-							$success = $log['success'] ?? false;
-							if ( $success ) {
+							if ( $task_id ) {
+								echo esc_html( $task_id );
+							} else {
+								echo '—';
+							}
+							?>
+						</td>
+						<td>
+							<?php
+							// Format details based on event type
+							if ( in_array( $direction, array( 'wp_to_clickup', 'clickup_to_wp' ), true ) ) {
+								// Sync events: show status change
+								echo '<strong>' . esc_html__( 'Status:', 'wpcusn' ) . '</strong> ';
+								echo esc_html( $old_status ) . ' → ' . esc_html( $new_status );
+							} elseif ( in_array( $direction, array( 'auto_link_attempt', 'auto_link_success', 'auto_link_failed' ), true ) ) {
+								// Auto-link events: show slug and search details
+								echo esc_html( $old_status );
+								if ( $new_status ) {
+									echo '<br />' . esc_html( $new_status );
+								}
+							} elseif ( 'task_unlinked' === $direction ) {
+								// Unlink event
+								echo esc_html( $old_status );
+								if ( $new_status ) {
+									echo '<br />' . esc_html( $new_status );
+								}
+							} else {
+								// Generic: show both
+								if ( $old_status ) {
+									echo esc_html( $old_status );
+								}
+								if ( $new_status ) {
+									if ( $old_status ) {
+										echo ' → ';
+									}
+									echo esc_html( $new_status );
+								}
+							}
+
+							// Show error if present
+							if ( $error ) {
+								echo '<br /><span style="color: red;"><small>' . esc_html( $error ) . '</small></span>';
+							}
+							?>
+						</td>
+						<td>
+							<?php
+							if ( null === $success ) {
+								// In progress or info event
+								echo '<span style="color: #666;">—</span>';
+							} elseif ( $success ) {
 								echo '<span style="color: green;">✓ ' . esc_html__( 'Success', 'wpcusn' ) . '</span>';
 							} else {
 								echo '<span style="color: red;">✗ ' . esc_html__( 'Failed', 'wpcusn' ) . '</span>';
-								if ( isset( $log['error'] ) ) {
-									echo '<br /><small>' . esc_html( $log['error'] ) . '</small>';
+								if ( $new_status && false !== strpos( $new_status, 'Failed:' ) ) {
+									$failure_msg = str_replace( 'Failed: ', '', $new_status );
+									echo '<br /><small style="color: red;">' . esc_html( $failure_msg ) . '</small>';
 								}
 							}
 							?>
