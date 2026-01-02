@@ -242,5 +242,52 @@ class WPCUSN_ClickUp_API {
 	public function get_user() {
 		return $this->request( '/user' );
 	}
+
+	/**
+	 * Create webhook
+	 *
+	 * @since 1.0.5
+	 * @param string $webhook_url The URL to receive webhook events
+	 * @param string $space_id Space ID to subscribe to
+	 * @param string $list_id Optional list ID to limit to specific list
+	 * @param array  $events Array of events to subscribe to (default: taskStatusUpdated)
+	 * @return array|WP_Error
+	 */
+	public function create_webhook( $webhook_url, $space_id, $list_id = null, $events = array( 'taskStatusUpdated' ) ) {
+		$body = array(
+			'endpoint' => $webhook_url,
+			'events'   => $events,
+		);
+
+		// Add location filters
+		if ( $list_id ) {
+			$body['list_id'] = $list_id;
+		}
+		$body['space_id'] = $space_id;
+
+		return $this->request( '/webhook', 'POST', $body );
+	}
+
+	/**
+	 * Get webhooks
+	 *
+	 * @since 1.0.5
+	 * @param string $team_id Team/Workspace ID
+	 * @return array|WP_Error
+	 */
+	public function get_webhooks( $team_id ) {
+		return $this->request( "/team/{$team_id}/webhook" );
+	}
+
+	/**
+	 * Delete webhook
+	 *
+	 * @since 1.0.5
+	 * @param string $webhook_id Webhook ID
+	 * @return array|WP_Error
+	 */
+	public function delete_webhook( $webhook_id ) {
+		return $this->request( "/webhook/{$webhook_id}", 'DELETE' );
+	}
 }
 
