@@ -31,13 +31,15 @@ npm-debug.log*
 # Node modules (if any)
 node_modules/
 
-# Composer
-vendor/
+# Composer - exclude vendor but keep plugin-update-checker
+vendor/*
 !vendor/plugin-update-checker/
-
-# Keep plugin-update-checker in vendor if it exists
 !vendor/plugin-update-checker/**
+# Keep nested vendor inside plugin-update-checker (for Parsedown, etc.)
+!vendor/plugin-update-checker/vendor/
+!vendor/plugin-update-checker/vendor/**
 
-# Keep plugin-update-checker-master if user added it
+# Keep plugin-update-checker-master if user added it (alternative location)
+!plugin-update-checker-master/
 !plugin-update-checker-master/**
 
