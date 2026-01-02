@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 02/01/2026
+
+### Added
+- **Configurable Search Settings**: New "Search & Log Settings" section in settings page
+  - Include Closed Tasks toggle (default OFF for performance - enable to search 10K+ closed tasks)
+  - Max Log Entries dropdown (50, 100, 200, 500 - default 200)
+  - Log Retention Days input (default 7 days, automatic cleanup)
+- **Early Exit Optimization**: Task search now returns immediately when exact match is found, avoiding unnecessary API calls
+- **Time-based Log Cleanup**: Logs older than retention period are automatically deleted
+
+### Changed
+- Closed tasks are now excluded from search by default (major performance improvement for workspaces with many closed tasks)
+- Log limit increased from 50 to 200 entries by default
+- Log settings are now configurable via the settings page instead of hardcoded
+
 ## [1.2.3] - 02/01/2026
 
 ### Fixed

@@ -251,6 +251,10 @@ class WPCUSN_ClickUp_API
 	 * Search tasks using Get Filtered Team Tasks endpoint
 	 *
 	 * This endpoint searches across ALL lists in a space.
+	 * Includes performance optimizations:
+	 * - Early exit when match found
+	 * - Configurable include_closed setting
+	 * - Max pages limit
 	 *
 	 * @since 1.2.1
 	 * @param string $team_id Team/Workspace ID
@@ -263,42 +267,56 @@ class WPCUSN_ClickUp_API
 		$all_tasks = array();
 		$page = 0;
 		$max_pages = 50; // Handle 5000+ tasks
+		$search_lower = strtolower(trim($task_name));
 
-		// Log the search attempt (single log entry, not per-page)
-		$this->log_api_debug("Team search starting: team_id={$team_id}, space_id={$space_id}, looking for: '{$task_name}'");
+		// Configurable: include closed tasks (default OFF for performance)
+		$include_closed = get_option('wpcusn_include_closed_tasks', false) ? 'true' : 'false';
+
+		$this->log_api_debug("Team search: looking for '{$task_name}' (include_closed={$include_closed})");
 
 		do {
-			// Use query params - ClickUp API v2 expects space_ids[] as array parameter
-			$endpoint = "/team/{$team_id}/task?page={$page}&space_ids[]={$space_id}";
+			$endpoint = "/team/{$team_id}/task?page={$page}&space_ids[]={$space_id}&include_closed={$include_closed}";
 			$result = $this->request($endpoint);
 
 			if (is_wp_error($result)) {
 				$this->log_api_debug("Team search error on page {$page}: " . $result->get_error_message());
-				// If no tasks found yet, return error; otherwise return what we have
 				if (empty($all_tasks)) {
 					return $result;
 				}
 				break;
 			}
 
-			if (isset($result['tasks']) && is_array($result['tasks'])) {
-				$all_tasks = array_merge($all_tasks, $result['tasks']);
+			$page_tasks = isset($result['tasks']) ? $result['tasks'] : array();
+
+			// EARLY EXIT: Check for exact match on each page to avoid fetching all pages
+			foreach ($page_tasks as $task) {
+				if (isset($task['name'])) {
+					$task_lower = strtolower(trim($task['name']));
+					if ($task_lower === $search_lower) {
+						$this->log_api_debug("Team search: MATCH found on page {$page}! Returning early.");
+						return array('tasks' => array($task));
+					}
+				}
 			}
 
-			// Check if there are more pages (ClickUp returns up to 100 tasks per page)
-			$has_more = isset($result['tasks']) && count($result['tasks']) >= 100;
+			$all_tasks = array_merge($all_tasks, $page_tasks);
+
+			// Check if there are more pages
+			$has_more = count($page_tasks) >= 100;
 			$page++;
 
 		} while ($has_more && $page < $max_pages);
 
-		// Log summary only (not per-page)
 		$total_count = count($all_tasks);
-		$this->log_api_debug("Team search complete: {$total_count} tasks found across {$page} page(s)");
+		$this->log_api_debug("Team search complete: {$total_count} tasks scanned across {$page} page(s), no exact match");
 
-		// Filter tasks by case-insensitive name match (with fuzzy fallback)
+		// No exact match found - try fuzzy matching
 		$filtered = $this->filter_tasks_by_name($all_tasks, $task_name, true);
 		$match_count = isset($filtered['tasks']) ? count($filtered['tasks']) : 0;
-		$this->log_api_debug("Team search result: {$match_count} task(s) matched '{$task_name}'");
+
+		if ($match_count > 0) {
+			$this->log_api_debug("Team search: {$match_count} fuzzy match(es) found");
+		}
 
 		return $filtered;
 	}
@@ -321,9 +339,26 @@ class WPCUSN_ClickUp_API
 			'success' => null,
 			'timestamp' => current_time('mysql'),
 		);
-		if (count($logs) > 50) {
-			$logs = array_slice($logs, -50);
+
+		// Get configurable limits
+		$log_limit = (int) get_option('wpcusn_log_limit', 200);
+		$retention_days = (int) get_option('wpcusn_log_retention_days', 7);
+
+		// Time-based cleanup: remove logs older than retention period
+		if ($retention_days > 0) {
+			$cutoff = strtotime("-{$retention_days} days");
+			$logs = array_filter($logs, function ($log) use ($cutoff) {
+				$timestamp = isset($log['timestamp']) ? strtotime($log['timestamp']) : 0;
+				return $timestamp > $cutoff;
+			});
+			$logs = array_values($logs); // Re-index
 		}
+
+		// Enforce max log limit
+		if (count($logs) > $log_limit) {
+			$logs = array_slice($logs, -$log_limit);
+		}
+
 		update_option('wpcusn_sync_logs', $logs);
 	}
 

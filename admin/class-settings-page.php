@@ -124,36 +124,40 @@ class WPCUSN_Settings_Page
 		$this->debug_log('Nonce verified, processing settings');
 		$this->debug_log('POST data keys: ' . implode(', ', array_keys($_POST)));
 		$this->debug_log('Checking if disconnected transient exists: ' . (get_transient('wpcusn_disconnected_notice') ? 'YES' : 'NO'));
-		
+
 		// DEBUG: Log all POST values for space_id related fields
 		$this->debug_log('DEBUG SPACE_ID - POST wpcusn_space_id (dropdown): ' . (isset($_POST['wpcusn_space_id']) ? $_POST['wpcusn_space_id'] : 'NOT SET'));
 		$this->debug_log('DEBUG SPACE_ID - POST wpcusn_space_id_manual (manual input): ' . (isset($_POST['wpcusn_space_id_manual']) ? $_POST['wpcusn_space_id_manual'] : 'NOT SET'));
 		$this->debug_log('DEBUG SPACE_ID - POST wpcusn_team_id: ' . (isset($_POST['wpcusn_team_id']) ? $_POST['wpcusn_team_id'] : 'NOT SET'));
 		$this->debug_log('DEBUG SPACE_ID - Current DB wpcusn_space_id: ' . get_option('wpcusn_space_id', 'NOT SET'));
 		$this->debug_log('DEBUG SPACE_ID - Current DB wpcusn_team_id: ' . get_option('wpcusn_team_id', 'NOT SET'));
-		
+
 		// Check if this is a webhook action WITHOUT settings fields (webhook-only submission)
 		// If settings fields are present, save them even if wpcusn_action is set
 		$has_settings_fields = isset($_POST['wpcusn_api_key']) || isset($_POST['wpcusn_space_id']) || isset($_POST['wpcusn_oauth_client_id']);
 		$is_webhook_only = isset($_POST['wpcusn_action']) && in_array($_POST['wpcusn_action'], array('create_webhook', 'delete_webhook'), true) && !$has_settings_fields;
-		
+
 		$this->debug_log('Has settings fields: ' . ($has_settings_fields ? 'YES' : 'NO'));
 		$this->debug_log('Is webhook only: ' . ($is_webhook_only ? 'YES' : 'NO'));
-		
+
 		if (!$is_webhook_only) {
 			// This is a settings form submission - save all settings
 			$settings = array(
-				'wpcusn_oauth_client_id'     => isset($_POST['wpcusn_oauth_client_id']) ? sanitize_text_field($_POST['wpcusn_oauth_client_id']) : '',
+				'wpcusn_oauth_client_id' => isset($_POST['wpcusn_oauth_client_id']) ? sanitize_text_field($_POST['wpcusn_oauth_client_id']) : '',
 				'wpcusn_oauth_client_secret' => isset($_POST['wpcusn_oauth_client_secret']) ? sanitize_text_field($_POST['wpcusn_oauth_client_secret']) : '',
-				'wpcusn_api_key'             => isset($_POST['wpcusn_api_key']) ? sanitize_text_field($_POST['wpcusn_api_key']) : '',
-				'wpcusn_space_id'            => isset($_POST['wpcusn_space_id']) ? sanitize_text_field($_POST['wpcusn_space_id']) : '',
-				'wpcusn_team_id'             => isset($_POST['wpcusn_team_id']) ? sanitize_text_field($_POST['wpcusn_team_id']) : '',
-				'wpcusn_list_id'             => isset($_POST['wpcusn_list_id']) ? sanitize_text_field($_POST['wpcusn_list_id']) : '',
+				'wpcusn_api_key' => isset($_POST['wpcusn_api_key']) ? sanitize_text_field($_POST['wpcusn_api_key']) : '',
+				'wpcusn_space_id' => isset($_POST['wpcusn_space_id']) ? sanitize_text_field($_POST['wpcusn_space_id']) : '',
+				'wpcusn_team_id' => isset($_POST['wpcusn_team_id']) ? sanitize_text_field($_POST['wpcusn_team_id']) : '',
+				'wpcusn_list_id' => isset($_POST['wpcusn_list_id']) ? sanitize_text_field($_POST['wpcusn_list_id']) : '',
+				// Search & Log settings
+				'wpcusn_include_closed_tasks' => isset($_POST['wpcusn_include_closed_tasks']) ? 1 : 0,
+				'wpcusn_log_limit' => isset($_POST['wpcusn_log_limit']) ? absint($_POST['wpcusn_log_limit']) : 200,
+				'wpcusn_log_retention_days' => isset($_POST['wpcusn_log_retention_days']) ? absint($_POST['wpcusn_log_retention_days']) : 7,
 			);
 
 			foreach ($settings as $key => $value) {
 				$old_value = get_option($key);
-				
+
 				// DEBUG: Extra logging for space_id
 				if ($key === 'wpcusn_space_id') {
 					$this->debug_log("=== DEBUG SPACE_ID SAVE ===");
@@ -163,24 +167,24 @@ class WPCUSN_Settings_Page
 					$this->debug_log("Old DB value: '" . $old_value . "'");
 					$this->debug_log("Values match? " . ($value === $old_value ? 'YES' : 'NO'));
 				}
-				
+
 				// Always update, even if value appears the same
 				// update_option returns false if value is unchanged, but that's OK
 				$result = update_option($key, $value);
-				
+
 				// Verify it was actually saved by reading it back
 				$saved_value = get_option($key);
 				$actually_saved = ($saved_value === $value);
-				
+
 				$this->debug_log("Saving {$key}: POST='" . (empty($value) ? '(empty)' : substr($value, 0, 15) . '...') . "', OLD='" . (empty($old_value) ? '(empty)' : substr($old_value, 0, 15) . '...') . "', SAVED='" . (empty($saved_value) ? '(empty)' : substr($saved_value, 0, 15) . '...') . "', update_option=" . ($result ? 'true' : 'false') . ", verified=" . ($actually_saved ? 'YES' : 'NO'));
-				
+
 				// DEBUG: Extra logging for space_id after save
 				if ($key === 'wpcusn_space_id') {
 					$this->debug_log("After save - DB value: '" . $saved_value . "'");
 					$this->debug_log("After save - Match? " . ($saved_value === $value ? 'YES' : 'NO'));
 					$this->debug_log("=== END DEBUG SPACE_ID SAVE ===");
 				}
-				
+
 				if (!$actually_saved) {
 					$this->debug_log("ERROR: {$key} MISMATCH! Expected: '" . $value . "', Got: '" . $saved_value . "'");
 					// Force update by deleting first, then adding
@@ -189,7 +193,7 @@ class WPCUSN_Settings_Page
 					$saved_value = get_option($key);
 					$this->debug_log("Force update result: " . ($saved_value === $value ? 'SUCCESS' : 'STILL FAILED - ' . $saved_value));
 				}
-				
+
 				// Check if we're clearing OAuth credentials
 				if (in_array($key, array('wpcusn_oauth_client_id', 'wpcusn_oauth_client_secret')) && !empty($old_value) && empty($value)) {
 					$this->debug_log("WARNING: Clearing {$key} - this might trigger disconnect logic");
@@ -238,7 +242,7 @@ class WPCUSN_Settings_Page
 	private function handle_webhook_creation()
 	{
 		$this->debug_log('handle_webhook_creation called');
-		
+
 		$space_id = get_option('wpcusn_space_id');
 		$list_id = get_option('wpcusn_list_id');
 		$team_id = get_option('wpcusn_team_id');
@@ -296,7 +300,7 @@ class WPCUSN_Settings_Page
 	private function handle_webhook_deletion()
 	{
 		$this->debug_log('handle_webhook_deletion called');
-		
+
 		$webhook_id = get_option('wpcusn_webhook_id');
 		if ($webhook_id) {
 			$this->debug_log("Deleting webhook ID: {$webhook_id}");
@@ -376,7 +380,7 @@ class WPCUSN_Settings_Page
 				}
 			}
 		}
-		
+
 		// Also display any current settings errors (in case they weren't stored in transient)
 		settings_errors('wpcusn_settings');
 	}

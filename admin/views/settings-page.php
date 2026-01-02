@@ -114,7 +114,8 @@ $logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
 							<?php if ($space_id): ?>
 								<option value="<?php echo esc_attr($space_id); ?>"
 									data-team-id="<?php echo esc_attr(get_option('wpcusn_team_id')); ?>" selected>
-									<?php echo esc_html($space_id); ?></option>
+									<?php echo esc_html($space_id); ?>
+								</option>
 							<?php endif; ?>
 						</select>
 						<input type="hidden" id="wpcusn_current_space_id" value="<?php echo esc_attr($space_id); ?>" />
@@ -158,6 +159,61 @@ $logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
 						value="<?php echo esc_attr($list_id); ?>" class="regular-text" />
 					<p class="description">
 						<?php esc_html_e('Optional: Limit search to a specific list. If not provided, the plugin will search across all lists in the space.', 'wpcusn'); ?>
+					</p>
+				</td>
+			</tr>
+		</table>
+
+		<h2><?php esc_html_e('Search & Log Settings', 'wpcusn'); ?></h2>
+		<p class="description" style="margin-bottom: 15px;">
+			<?php esc_html_e('Configure search behavior and log retention for optimal performance.', 'wpcusn'); ?>
+		</p>
+
+		<table class="form-table">
+			<tr>
+				<th scope="row">
+					<label
+						for="wpcusn_include_closed_tasks"><?php esc_html_e('Include Closed Tasks', 'wpcusn'); ?></label>
+				</th>
+				<td>
+					<label>
+						<input type="checkbox" id="wpcusn_include_closed_tasks" name="wpcusn_include_closed_tasks"
+							value="1" <?php checked(get_option('wpcusn_include_closed_tasks', false)); ?> />
+						<?php esc_html_e('Search closed/completed tasks when auto-linking', 'wpcusn'); ?>
+					</label>
+					<p class="description">
+						<?php esc_html_e('⚠️ Warning: Enable only if needed. With 10K+ closed tasks, this slows search significantly.', 'wpcusn'); ?>
+					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="wpcusn_log_limit"><?php esc_html_e('Max Log Entries', 'wpcusn'); ?></label>
+				</th>
+				<td>
+					<?php $log_limit = get_option('wpcusn_log_limit', 200); ?>
+					<select id="wpcusn_log_limit" name="wpcusn_log_limit">
+						<option value="50" <?php selected($log_limit, 50); ?>>50</option>
+						<option value="100" <?php selected($log_limit, 100); ?>>100</option>
+						<option value="200" <?php selected($log_limit, 200); ?>>200</option>
+						<option value="500" <?php selected($log_limit, 500); ?>>500</option>
+					</select>
+					<p class="description">
+						<?php esc_html_e('Maximum number of log entries to keep. Older entries are automatically removed.', 'wpcusn'); ?>
+					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label
+						for="wpcusn_log_retention_days"><?php esc_html_e('Log Retention (Days)', 'wpcusn'); ?></label>
+				</th>
+				<td>
+					<?php $retention_days = get_option('wpcusn_log_retention_days', 7); ?>
+					<input type="number" id="wpcusn_log_retention_days" name="wpcusn_log_retention_days"
+						value="<?php echo esc_attr($retention_days); ?>" min="1" max="90" style="width: 80px;" />
+					<p class="description">
+						<?php esc_html_e('Logs older than this many days are automatically deleted. Set 0 to disable.', 'wpcusn'); ?>
 					</p>
 				</td>
 			</tr>
