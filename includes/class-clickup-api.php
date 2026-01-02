@@ -292,7 +292,7 @@ class WPCUSN_ClickUp_API {
 	/**
 	 * Get webhooks
 	 *
-	 * @since 1.0.6
+	 * @since 1.0.7
 	 * @param string $team_id Team/Workspace ID
 	 * @return array|WP_Error
 	 */
@@ -303,7 +303,7 @@ class WPCUSN_ClickUp_API {
 	/**
 	 * Delete webhook
 	 *
-	 * @since 1.0.6
+	 * @since 1.0.7
 	 * @param string $webhook_id Webhook ID
 	 * @return array|WP_Error
 	 */
