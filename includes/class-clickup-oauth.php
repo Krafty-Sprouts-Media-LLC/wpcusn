@@ -73,13 +73,14 @@ class WPCUSN_ClickUp_OAuth {
 		$state = wp_create_nonce( 'wpcusn_oauth_state' );
 		set_transient( 'wpcusn_oauth_state', $state, 600 );
 
+		// ClickUp OAuth authorization endpoint (http_build_query will encode the redirect_uri automatically)
 		$params = array(
 			'client_id'    => $client_id,
-			'redirect_uri' => urlencode( $redirect_uri ),
+			'redirect_uri' => $redirect_uri,
 			'state'        => $state,
 		);
 
-		return 'https://app.clickup.com/api/v2/oauth?' . http_build_query( $params );
+		return 'https://app.clickup.com/api?' . http_build_query( $params );
 	}
 
 	/**
