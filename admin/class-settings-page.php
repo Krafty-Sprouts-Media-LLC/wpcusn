@@ -48,7 +48,6 @@ class WPCUSN_Settings_Page {
 	private function __construct() {
 		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
-		add_action( 'admin_init', array( $this, 'handle_settings_save' ), 999 );
 		add_action( 'admin_notices', array( $this, 'show_admin_notices' ) );
 		add_action( 'wp_ajax_wpcusn_get_spaces', array( $this, 'ajax_get_spaces' ) );
 		add_action( 'admin_post_wpcusn_disconnect', array( $this, 'handle_disconnect' ) );

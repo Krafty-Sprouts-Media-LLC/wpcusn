@@ -8,8 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.2] - 2026-01-02
 
 ### Fixed
-- Fixed redirect to options.php after saving settings - now properly redirects back to settings page
-- Improved redirect handling to catch all settings form submissions
+- Fixed redirect to options.php after saving settings - now properly redirects back to settings page with success message
+- Removed confusing manual webhook setup instructions - webhook creation is now automatic only
+- Cleaned up webhook configuration section for better UX
 
 ## [1.1.1] - 2026-01-02
 

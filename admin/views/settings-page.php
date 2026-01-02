@@ -228,16 +228,9 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 						<?php endif; ?>
 					<?php else : ?>
 						<p class="description">
-							<?php esc_html_e( 'Please connect to ClickUp and configure your Space ID first.', 'wpcusn' ); ?>
+							<?php esc_html_e( 'Please connect to ClickUp and configure your Space ID first, then click "Create Webhook Automatically" above.', 'wpcusn' ); ?>
 						</p>
 					<?php endif; ?>
-					<p class="description" style="margin-top: 10px;">
-						<strong><?php esc_html_e( 'Manual Setup (Alternative):', 'wpcusn' ); ?></strong><br />
-						<?php esc_html_e( 'Webhooks must be created via the ClickUp API. Use the Create Webhook endpoint with:', 'wpcusn' ); ?><br />
-						• <?php esc_html_e( 'Endpoint:', 'wpcusn' ); ?> <code><?php echo esc_url( $webhook_url ); ?></code><br />
-						• <?php esc_html_e( 'Event:', 'wpcusn' ); ?> <code>taskStatusUpdated</code><br />
-						• <?php esc_html_e( 'Space ID:', 'wpcusn' ); ?> <code><?php echo esc_html( $space_id ?: 'Your Space ID' ); ?></code>
-					</p>
 				</td>
 			</tr>
 		</table>
