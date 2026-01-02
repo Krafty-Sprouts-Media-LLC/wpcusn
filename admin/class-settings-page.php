@@ -87,6 +87,9 @@ class WPCUSN_Settings_Page {
 		// List ID (optional, for limiting search to specific list)
 		register_setting( 'wpcusn_settings', 'wpcusn_list_id' );
 
+		// Redirect back to settings page after save
+		add_filter( 'wp_redirect', array( $this, 'redirect_after_save' ), 10, 2 );
+
 		// Handle disconnect moved to separate handler
 
 		// Handle webhook creation
@@ -134,6 +137,24 @@ class WPCUSN_Settings_Page {
 	}
 
 	/**
+	 * Redirect back to settings page after save
+	 *
+	 * @since 1.1.0
+	 * @param string $location Redirect URL
+	 * @param int    $status   HTTP status code
+	 * @return string
+	 */
+	public function redirect_after_save( $location, $status ) {
+		// Only redirect if we're coming from our settings page
+		if ( isset( $_POST['option_page'] ) && 'wpcusn_settings' === $_POST['option_page'] ) {
+			if ( strpos( $location, 'options.php' ) !== false ) {
+				$location = admin_url( 'options-general.php?page=wpcusn&settings-updated=1' );
+			}
+		}
+		return $location;
+	}
+
+	/**
 	 * Show admin notices
 	 *
 	 * @since 1.0.0
@@ -155,6 +176,10 @@ class WPCUSN_Settings_Page {
 		if ( isset( $_GET['disconnected'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Disconnected from ClickUp.', 'wpcusn' ) . '</p></div>';
 		}
+
+		if ( isset( $_GET['settings-updated'] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'wpcusn' ) . '</p></div>';
+		}
 	}
 
 	/**
@@ -169,7 +194,7 @@ class WPCUSN_Settings_Page {
 	/**
 	 * Handle disconnect action
 	 *
-	 * @since 1.0.8
+	 * @since 1.0.9
 	 */
 	public function handle_disconnect() {
 		check_admin_referer( 'wpcusn_disconnect', 'wpcusn_disconnect_nonce' );

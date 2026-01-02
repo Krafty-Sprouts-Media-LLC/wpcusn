@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-01-02
+
+### Fixed
+- Fixed redirect to options.php after saving settings - now redirects back to settings page
+- Settings page now shows "Settings saved" message after successful save
+- Fixed sync code to use Space ID instead of List ID for status lookups
+
 ## [1.0.9] - 2026-01-02
 
 ### Fixed
