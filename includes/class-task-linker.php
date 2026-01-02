@@ -57,10 +57,8 @@ class WPCUSN_Task_Linker {
 	 * @return string Title case string
 	 */
 	private function slug_to_title( $slug ) {
-		// Replace hyphens with spaces
+		// Replace hyphens with spaces - keep original case
 		$title = str_replace( '-', ' ', $slug );
-		// Convert to title case
-		$title = ucwords( strtolower( $title ) );
 		return $title;
 	}
 
@@ -113,13 +111,18 @@ class WPCUSN_Task_Linker {
 			return;
 		}
 
-		// Find exact match
+		// Find exact match (case-insensitive)
 		if ( isset( $result['tasks'] ) && is_array( $result['tasks'] ) ) {
 			foreach ( $result['tasks'] as $task ) {
-				if ( isset( $task['name'] ) && $task['name'] === $task_name ) {
-					// Store task ID
+				// Match task name (case-insensitive) or exact match
+				$task_name_match = isset( $task['name'] ) ? $task['name'] : '';
+				if ( strcasecmp( $task_name_match, $task_name ) === 0 || $task_name_match === $task_name ) {
+					// Store task ID and list ID
 					update_post_meta( $post_id, '_clickup_task_id', $task['id'] );
 					update_post_meta( $post_id, '_clickup_task_name', $task['name'] );
+					if ( isset( $task['list']['id'] ) ) {
+						update_post_meta( $post_id, '_clickup_list_id', $task['list']['id'] );
+					}
 					update_post_meta( $post_id, '_clickup_linked_at', current_time( 'mysql' ) );
 
 					// Add admin notice
