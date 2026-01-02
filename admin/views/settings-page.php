@@ -102,12 +102,24 @@ $webhook_url = rest_url( 'clickup/v1/webhook' );
 		<table class="form-table">
 			<tr>
 				<th scope="row">
-					<label for="wpcusn_list_id"><?php esc_html_e( 'List ID', 'wpcusn' ); ?></label>
+					<label for="wpcusn_space_id"><?php esc_html_e( 'Space ID', 'wpcusn' ); ?></label>
+				</th>
+				<td>
+					<?php $space_id = get_option( 'wpcusn_space_id' ); ?>
+					<input type="text" id="wpcusn_space_id" name="wpcusn_space_id" value="<?php echo esc_attr( $space_id ); ?>" class="regular-text" />
+					<p class="description">
+						<?php esc_html_e( 'The ClickUp Space ID where your tasks are located. Found in the space URL: app.clickup.com/{space_id}/... The plugin will search across all lists in this space.', 'wpcusn' ); ?>
+					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="wpcusn_list_id"><?php esc_html_e( 'List ID (Optional)', 'wpcusn' ); ?></label>
 				</th>
 				<td>
 					<input type="text" id="wpcusn_list_id" name="wpcusn_list_id" value="<?php echo esc_attr( $list_id ); ?>" class="regular-text" />
 					<p class="description">
-						<?php esc_html_e( 'The ClickUp List ID where your tasks are located. Found in the list URL: app.clickup.com/.../{list_id}', 'wpcusn' ); ?>
+						<?php esc_html_e( 'Optional: Limit search to a specific list. If not provided, the plugin will search across all lists in the space.', 'wpcusn' ); ?>
 					</p>
 				</td>
 			</tr>

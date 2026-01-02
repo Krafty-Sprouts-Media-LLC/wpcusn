@@ -150,34 +150,65 @@ class WPCUSN_ClickUp_API {
 	}
 
 	/**
-	 * Search tasks in list
+	 * Search tasks in space (across all lists)
 	 *
 	 * @since 1.0.0
-	 * @param string $list_id List ID
+	 * @param string $space_id Space ID
 	 * @param string $task_name Task name to search
+	 * @param string $list_id Optional list ID to limit search to specific list
 	 * @return array|WP_Error
 	 */
-	public function search_tasks( $list_id, $task_name ) {
-		// ClickUp API doesn't support name filter, so we get all tasks and filter
-		$endpoint = "/list/{$list_id}/task";
-		$result = $this->request( $endpoint );
+	public function search_tasks( $space_id, $task_name, $list_id = null ) {
+		$all_tasks = array();
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
+		// If list_id is provided, search only that list
+		if ( $list_id ) {
+			$endpoint = "/list/{$list_id}/task";
+			$result = $this->request( $endpoint );
+
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+
+			if ( isset( $result['tasks'] ) && is_array( $result['tasks'] ) ) {
+				$all_tasks = $result['tasks'];
+			}
+		} else {
+			// Search across all lists in the space
+			$lists_result = $this->get_lists( $space_id );
+			if ( is_wp_error( $lists_result ) ) {
+				return $lists_result;
+			}
+
+			if ( ! isset( $lists_result['lists'] ) || ! is_array( $lists_result['lists'] ) ) {
+				return array( 'tasks' => array() );
+			}
+
+			// Get tasks from all lists
+			foreach ( $lists_result['lists'] as $list ) {
+				$list_id = $list['id'] ?? '';
+				if ( ! $list_id ) {
+					continue;
+				}
+
+				$endpoint = "/list/{$list_id}/task";
+				$result = $this->request( $endpoint );
+
+				if ( ! is_wp_error( $result ) && isset( $result['tasks'] ) && is_array( $result['tasks'] ) ) {
+					$all_tasks = array_merge( $all_tasks, $result['tasks'] );
+				}
+			}
 		}
 
 		// Filter tasks by exact name match
-		if ( isset( $result['tasks'] ) && is_array( $result['tasks'] ) ) {
-			$filtered = array();
-			foreach ( $result['tasks'] as $task ) {
-				if ( isset( $task['name'] ) && $task['name'] === $task_name ) {
-					$filtered[] = $task;
-				}
+		$filtered = array();
+		foreach ( $all_tasks as $task ) {
+			if ( isset( $task['name'] ) && $task['name'] === $task_name ) {
+				$filtered[] = $task;
 			}
-			$result['tasks'] = $filtered;
 		}
 
-		return $result;
+		return array( 'tasks' => $filtered );
 	}
 
 	/**

@@ -5,11 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.4] - 2026-01-02
+## [1.0.5] - 2026-01-02
+
+### Changed
+- **BREAKING:** Changed from List ID to Space ID as primary configuration
+- Plugin now searches across all lists in a space instead of a single list
+- List ID is now optional and can be used to limit search to a specific list
+- Improved task search to work at space level for better flexibility
 
 ### Fixed
 - Fixed OAuth token exchange endpoint (changed from `app.clickup.com` to `api.clickup.com`)
 - Improved OAuth error handling with better error messages and logging
+
+## [1.0.4] - 2026-01-02
 
 ### Changed
 - Updated minimum WordPress version requirement to 6.8+

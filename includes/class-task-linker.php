@@ -94,9 +94,11 @@ class WPCUSN_Task_Linker {
 			return;
 		}
 
-		// Get list ID
+		// Get space ID (primary) or list ID (fallback)
+		$space_id = get_option( 'wpcusn_space_id' );
 		$list_id = get_option( 'wpcusn_list_id' );
-		if ( ! $list_id ) {
+
+		if ( ! $space_id && ! $list_id ) {
 			return;
 		}
 
@@ -105,7 +107,7 @@ class WPCUSN_Task_Linker {
 
 		// Search for task in ClickUp
 		$api = WPCUSN_ClickUp_API::get_instance();
-		$result = $api->search_tasks( $list_id, $task_name );
+		$result = $api->search_tasks( $space_id ?: $list_id, $task_name, $list_id );
 
 		if ( is_wp_error( $result ) ) {
 			return;

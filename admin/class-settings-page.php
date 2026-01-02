@@ -79,7 +79,10 @@ class WPCUSN_Settings_Page {
 		// API Key (fallback)
 		register_setting( 'wpcusn_settings', 'wpcusn_api_key' );
 
-		// List ID
+		// Space ID (primary)
+		register_setting( 'wpcusn_settings', 'wpcusn_space_id' );
+
+		// List ID (optional, for limiting search to specific list)
 		register_setting( 'wpcusn_settings', 'wpcusn_list_id' );
 
 		// Handle disconnect
