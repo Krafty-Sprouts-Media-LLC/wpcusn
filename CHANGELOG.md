@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.6] - 02/01/2026
+
+### Fixed
+- **Webhook Handler**: Improved validation to prevent errors when ClickUp sends webhooks with empty task data
+- **Webhook Handler**: Now silently ignores non-status events instead of logging spam
+- **Log Cleanup**: Updated all log methods to use configurable log limits instead of hardcoded 50
+
+### Changed
+- Webhook errors are now only logged when actual data issues occur, reducing log noise
+
 ## [1.2.5] - 02/01/2026
 
 ### Fixed

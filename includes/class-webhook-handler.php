@@ -12,14 +12,15 @@
  */
 
 // Exit if accessed directly
-if ( ! defined( 'ABSPATH' ) ) {
+if (!defined('ABSPATH')) {
 	exit;
 }
 
 /**
  * Webhook Handler Class
  */
-class WPCUSN_Webhook_Handler {
+class WPCUSN_Webhook_Handler
+{
 	/**
 	 * Single instance
 	 *
@@ -33,8 +34,9 @@ class WPCUSN_Webhook_Handler {
 	 * @since 1.0.0
 	 * @return WPCUSN_Webhook_Handler
 	 */
-	public static function get_instance() {
-		if ( null === self::$instance ) {
+	public static function get_instance()
+	{
+		if (null === self::$instance) {
 			self::$instance = new self();
 		}
 		return self::$instance;
@@ -45,8 +47,9 @@ class WPCUSN_Webhook_Handler {
 	 *
 	 * @since 1.0.0
 	 */
-	private function __construct() {
-		add_action( 'rest_api_init', array( $this, 'register_webhook_endpoint' ) );
+	private function __construct()
+	{
+		add_action('rest_api_init', array($this, 'register_webhook_endpoint'));
 	}
 
 	/**
@@ -54,14 +57,15 @@ class WPCUSN_Webhook_Handler {
 	 *
 	 * @since 1.0.0
 	 */
-	public function register_webhook_endpoint() {
+	public function register_webhook_endpoint()
+	{
 		register_rest_route(
 			'clickup/v1',
 			'/webhook',
 			array(
-				'methods'             => 'POST',
-				'callback'            => array( $this, 'handle_webhook' ),
-				'permission_callback' => array( $this, 'verify_webhook' ),
+				'methods' => 'POST',
+				'callback' => array($this, 'handle_webhook'),
+				'permission_callback' => array($this, 'verify_webhook'),
 			)
 		);
 	}
@@ -73,7 +77,8 @@ class WPCUSN_Webhook_Handler {
 	 * @param WP_REST_Request $request Request object
 	 * @return bool
 	 */
-	public function verify_webhook( $request ) {
+	public function verify_webhook($request)
+	{
 		// Basic verification - can be enhanced with webhook secret
 		return true;
 	}
@@ -85,73 +90,80 @@ class WPCUSN_Webhook_Handler {
 	 * @param WP_REST_Request $request Request object
 	 * @return WP_REST_Response
 	 */
-	public function handle_webhook( $request ) {
+	public function handle_webhook($request)
+	{
 		$body = $request->get_json_params();
 
-		// Log webhook received
+		// Validate event type first
 		$event_type = $body['event'] ?? 'unknown';
-		$task = $body['task'] ?? array();
-		$task_id = $task['id'] ?? '';
-		$task_name = $task['name'] ?? '';
-		$status = $task['status']['status'] ?? '';
-
-		// Log webhook received event
-		$this->log_webhook_received( $event_type, $task_id, $task_name, $status );
-
-		// Extract task information
-		if ( ! isset( $body['event'] ) || 'taskStatusUpdated' !== $body['event'] ) {
-			$this->log_webhook_error( $task_id, 'Invalid event type: ' . $event_type );
-			return new WP_REST_Response( array( 'success' => false, 'message' => 'Invalid event type' ), 400 );
+		if ('taskStatusUpdated' !== $event_type) {
+			// Silently ignore non-status events (don't log spam)
+			return new WP_REST_Response(array('success' => true, 'message' => 'Event ignored'), 200);
 		}
 
-		if ( ! $task_id || ! $status ) {
-			$this->log_webhook_error( $task_id, 'Missing task data (task_id or status)' );
-			return new WP_REST_Response( array( 'success' => false, 'message' => 'Missing task data' ), 400 );
+		// Extract task data with better validation
+		$task = $body['task'] ?? null;
+		if (!is_array($task) || empty($task)) {
+			$this->log_webhook_error('', 'Webhook received with empty task data');
+			return new WP_REST_Response(array('success' => false, 'message' => 'Empty task data'), 400);
+		}
+
+		$task_id = $task['id'] ?? '';
+		$task_name = $task['name'] ?? '';
+		$status = isset($task['status']['status']) ? $task['status']['status'] : '';
+
+		// Log webhook received event
+		$this->log_webhook_received($event_type, $task_id, $task_name, $status);
+
+		// Validate required fields
+		if (empty($task_id) || empty($status)) {
+			$this->log_webhook_error($task_id, 'Missing required fields (task_id or status)');
+			return new WP_REST_Response(array('success' => false, 'message' => 'Missing task data'), 400);
 		}
 
 		// Find WordPress post by stored task ID
 		$posts = get_posts(
 			array(
-				'post_type'      => 'post',
+				'post_type' => 'post',
 				'posts_per_page' => 1,
-				'meta_key'       => '_clickup_task_id',
-				'meta_value'     => $task_id,
-				'post_status'    => 'any',
+				'meta_key' => '_clickup_task_id',
+				'meta_value' => $task_id,
+				'post_status' => 'any',
 			)
 		);
 
-		if ( empty( $posts ) ) {
-			$this->log_webhook_error( $task_id, 'Post not found for this task' );
-			return new WP_REST_Response( array( 'success' => false, 'message' => 'Post not found for this task' ), 404 );
+		if (empty($posts)) {
+			$this->log_webhook_error($task_id, 'Post not found for this task');
+			return new WP_REST_Response(array('success' => false, 'message' => 'Post not found for this task'), 404);
 		}
 
 		$post = $posts[0];
 
 		// Map ClickUp status to WordPress status
 		$mapper = WPCUSN_Status_Mapper::get_instance();
-		$wp_status = $mapper->clickup_to_wp( $status );
+		$wp_status = $mapper->clickup_to_wp($status);
 
-		if ( ! $wp_status ) {
-			$this->log_webhook_error( $task_id, 'Status mapping not found for: ' . $status );
-			return new WP_REST_Response( array( 'success' => false, 'message' => 'Status mapping not found' ), 400 );
+		if (!$wp_status) {
+			$this->log_webhook_error($task_id, 'Status mapping not found for: ' . $status);
+			return new WP_REST_Response(array('success' => false, 'message' => 'Status mapping not found'), 400);
 		}
 
 		// Update post status
 		$old_status = $post->post_status;
 		wp_update_post(
 			array(
-				'ID'          => $post->ID,
+				'ID' => $post->ID,
 				'post_status' => $wp_status,
 			)
 		);
 
 		// Ensure task name is up to date
-		if ( $task_name ) {
-			update_post_meta( $post->ID, '_clickup_task_name', $task_name );
+		if ($task_name) {
+			update_post_meta($post->ID, '_clickup_task_name', $task_name);
 		}
 
 		// Log sync
-		$this->log_sync( $post->ID, $task_id, 'clickup_to_wp', $old_status, $wp_status, true );
+		$this->log_sync($post->ID, $task_id, 'clickup_to_wp', $old_status, $wp_status, true);
 
 		return new WP_REST_Response(
 			array(
@@ -172,21 +184,25 @@ class WPCUSN_Webhook_Handler {
 	 * @param string $task_name Task name
 	 * @param string $status Status
 	 */
-	private function log_webhook_received( $event_type, $task_id, $task_name, $status ) {
-		$logs = get_option( 'wpcusn_sync_logs', array() );
+	private function log_webhook_received($event_type, $task_id, $task_name, $status)
+	{
+		$logs = get_option('wpcusn_sync_logs', array());
 		$logs[] = array(
-			'post_id'    => 0,
-			'task_id'    => $task_id,
-			'direction'  => 'webhook_received',
+			'post_id' => 0,
+			'task_id' => $task_id,
+			'direction' => 'webhook_received',
 			'old_status' => "Event: {$event_type}",
 			'new_status' => "Task: '{$task_name}' ({$task_id}), Status: {$status}",
-			'success'    => null,
-			'timestamp'  => current_time( 'mysql' ),
+			'success' => null,
+			'timestamp' => current_time('mysql'),
 		);
-		if ( count( $logs ) > 50 ) {
-			$logs = array_slice( $logs, -50 );
+
+		// Use configurable log limit
+		$log_limit = (int) get_option('wpcusn_log_limit', 200);
+		if (count($logs) > $log_limit) {
+			$logs = array_slice($logs, -$log_limit);
 		}
-		update_option( 'wpcusn_sync_logs', $logs );
+		update_option('wpcusn_sync_logs', $logs);
 	}
 
 	/**
@@ -196,21 +212,25 @@ class WPCUSN_Webhook_Handler {
 	 * @param string $task_id Task ID
 	 * @param string $error_message Error message
 	 */
-	private function log_webhook_error( $task_id, $error_message ) {
-		$logs = get_option( 'wpcusn_sync_logs', array() );
+	private function log_webhook_error($task_id, $error_message)
+	{
+		$logs = get_option('wpcusn_sync_logs', array());
 		$logs[] = array(
-			'post_id'    => 0,
-			'task_id'    => $task_id,
-			'direction'  => 'webhook_error',
+			'post_id' => 0,
+			'task_id' => $task_id,
+			'direction' => 'webhook_error',
 			'old_status' => "Task ID: {$task_id}",
 			'new_status' => "Error: {$error_message}",
-			'success'    => false,
-			'timestamp'  => current_time( 'mysql' ),
+			'success' => false,
+			'timestamp' => current_time('mysql'),
 		);
-		if ( count( $logs ) > 50 ) {
-			$logs = array_slice( $logs, -50 );
+
+		// Use configurable log limit
+		$log_limit = (int) get_option('wpcusn_log_limit', 200);
+		if (count($logs) > $log_limit) {
+			$logs = array_slice($logs, -$log_limit);
 		}
-		update_option( 'wpcusn_sync_logs', $logs );
+		update_option('wpcusn_sync_logs', $logs);
 	}
 
 	/**
@@ -224,25 +244,26 @@ class WPCUSN_Webhook_Handler {
 	 * @param string $new_status New status
 	 * @param bool   $success Whether sync was successful
 	 */
-	private function log_sync( $post_id, $task_id, $direction, $old_status, $new_status, $success ) {
-		// Store in option for now (will move to DB table in Phase 6)
-		$logs = get_option( 'wpcusn_sync_logs', array() );
+	private function log_sync($post_id, $task_id, $direction, $old_status, $new_status, $success)
+	{
+		$logs = get_option('wpcusn_sync_logs', array());
 		$logs[] = array(
-			'post_id'    => $post_id,
-			'task_id'    => $task_id,
-			'direction'  => $direction,
+			'post_id' => $post_id,
+			'task_id' => $task_id,
+			'direction' => $direction,
 			'old_status' => $old_status,
 			'new_status' => $new_status,
-			'success'    => $success,
-			'timestamp'  => current_time( 'mysql' ),
+			'success' => $success,
+			'timestamp' => current_time('mysql'),
 		);
 
-		// Keep only last 50 logs
-		if ( count( $logs ) > 50 ) {
-			$logs = array_slice( $logs, -50 );
+		// Use configurable log limit
+		$log_limit = (int) get_option('wpcusn_log_limit', 200);
+		if (count($logs) > $log_limit) {
+			$logs = array_slice($logs, -$log_limit);
 		}
 
-		update_option( 'wpcusn_sync_logs', $logs );
+		update_option('wpcusn_sync_logs', $logs);
 	}
 }
 
