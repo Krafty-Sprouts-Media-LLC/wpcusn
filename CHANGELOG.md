@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 02/01/2026
+
+### Fixed
+- **Critical:** Fixed auto-linking not finding tasks. Implemented the Get Filtered Team Tasks endpoint (`/team/{team_id}/task`) which properly searches across ALL lists in a space
+- Added comprehensive API debug logging to Sync Logs for easier production debugging - now shows exactly what endpoint is called, how many tasks are found, and matching results
+- Added helper methods: `search_tasks_in_team()`, `log_api_debug()`, `filter_tasks_by_name()`
+- Added fallback search method for backwards compatibility
+
 ## [1.2.0] - 02/01/2026
 
 ### Added
