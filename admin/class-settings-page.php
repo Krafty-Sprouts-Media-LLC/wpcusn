@@ -92,6 +92,49 @@ class WPCUSN_Settings_Page {
 			wp_safe_redirect( admin_url( 'options-general.php?page=wpcusn&disconnected=1' ) );
 			exit;
 		}
+
+		// Handle webhook creation
+		if ( isset( $_POST['wpcusn_action'] ) && 'create_webhook' === $_POST['wpcusn_action'] && check_admin_referer( 'wpcusn_create_webhook' ) ) {
+			$space_id = get_option( 'wpcusn_space_id' );
+			$list_id = get_option( 'wpcusn_list_id' );
+			$webhook_url = rest_url( 'clickup/v1/webhook' );
+
+			if ( ! $space_id ) {
+				add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_error', __( 'Please configure Space ID first.', 'wpcusn' ), 'error' );
+			} else {
+				$api = WPCUSN_ClickUp_API::get_instance();
+				$result = $api->create_webhook( $webhook_url, $space_id, $list_id );
+
+				if ( is_wp_error( $result ) ) {
+					add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_error', __( 'Failed to create webhook: ', 'wpcusn' ) . $result->get_error_message(), 'error' );
+				} elseif ( isset( $result['webhook']['id'] ) ) {
+					update_option( 'wpcusn_webhook_id', $result['webhook']['id'] );
+					if ( isset( $result['webhook']['secret'] ) ) {
+						update_option( 'wpcusn_webhook_secret', $result['webhook']['secret'] );
+					}
+					add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_created', __( 'Webhook created successfully!', 'wpcusn' ), 'success' );
+				} else {
+					add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_error', __( 'Unexpected response from ClickUp API.', 'wpcusn' ), 'error' );
+				}
+			}
+		}
+
+		// Handle webhook deletion
+		if ( isset( $_POST['wpcusn_action'] ) && 'delete_webhook' === $_POST['wpcusn_action'] && check_admin_referer( 'wpcusn_delete_webhook' ) ) {
+			$webhook_id = get_option( 'wpcusn_webhook_id' );
+			if ( $webhook_id ) {
+				$api = WPCUSN_ClickUp_API::get_instance();
+				$result = $api->delete_webhook( $webhook_id );
+
+				if ( is_wp_error( $result ) ) {
+					add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_error', __( 'Failed to delete webhook: ', 'wpcusn' ) . $result->get_error_message(), 'error' );
+				} else {
+					delete_option( 'wpcusn_webhook_id' );
+					delete_option( 'wpcusn_webhook_secret' );
+					add_settings_error( 'wpcusn_settings', 'wpcusn_webhook_deleted', __( 'Webhook deleted successfully.', 'wpcusn' ), 'success' );
+				}
+			}
+		}
 	}
 
 	/**
