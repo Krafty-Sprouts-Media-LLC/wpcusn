@@ -3,10 +3,10 @@
  * Plugin Name: WPCUSN - WordPress ClickUp Sync-nator
  * Plugin URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
  * Description: Two-way status synchronization between WordPress and ClickUp
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Krafty Sprouts Media, LLC
  * Author URI: https://animalofthings.com
- * GitHub Plugin URI: Krafty-Sprouts-Media-LLC/wpcusn
+ * GitHub URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
  * Text Domain: wpcusn
  * Requires at least: 5.0
  * Requires PHP: 7.4
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants
-define( 'WPCUSN_VERSION', '1.0.0' );
+define( 'WPCUSN_VERSION', '1.0.1' );
 define( 'WPCUSN_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPCUSN_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPCUSN_PLUGIN_FILE', __FILE__ );
@@ -93,10 +93,12 @@ class WPCUSN {
 		}
 		if ( file_exists( $update_checker_path ) ) {
 			require_once $update_checker_path;
-			$update_checker = Puc_v4_Factory::buildUpdateChecker(
-				'https://github.com/Krafty-Sprouts-Media-LLC/wpcusn',
+			// Use buildFromHeader which reads GitHub URI from plugin header automatically
+			$update_checker = \YahnisElsts\PluginUpdateChecker\v5p6\PucFactory::buildFromHeader(
 				WPCUSN_PLUGIN_FILE,
-				'wpcusn'
+				array(
+					'slug' => 'wpcusn',
+				)
 			);
 		}
 	}
