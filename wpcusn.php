@@ -3,7 +3,7 @@
  * Plugin Name: WPCUSN - WordPress ClickUp Sync-nator
  * Plugin URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
  * Description: Two-way status synchronization between WordPress and ClickUp
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Krafty Sprouts Media, LLC
  * Author URI: https://animalofthings.com
  * GitHub URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants
-define( 'WPCUSN_VERSION', '1.0.1' );
+define( 'WPCUSN_VERSION', '1.0.2' );
 define( 'WPCUSN_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPCUSN_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPCUSN_PLUGIN_FILE', __FILE__ );
@@ -98,6 +98,7 @@ class WPCUSN {
 				WPCUSN_PLUGIN_FILE,
 				array(
 					'slug' => 'wpcusn',
+					'checkPeriod' => 1, // Check every hour instead of default 12 hours
 				)
 			);
 		}

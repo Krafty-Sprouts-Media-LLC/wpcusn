@@ -62,6 +62,15 @@ $webhook_url = rest_url( 'clickup/v1/webhook' );
 						<label for="wpcusn_oauth_client_secret"><?php esc_html_e( 'Client Secret:', 'wpcusn' ); ?></label><br />
 						<input type="password" id="wpcusn_oauth_client_secret" name="wpcusn_oauth_client_secret" value="<?php echo esc_attr( $client_secret ); ?>" class="regular-text" />
 					</p>
+					<p class="description">
+						<strong><?php esc_html_e( 'Redirect URI:', 'wpcusn' ); ?></strong><br />
+						<code style="display: block; padding: 8px; background: #f5f5f5; margin-top: 5px;"><?php echo esc_url( admin_url( 'options-general.php?page=wpcusn&action=oauth_callback' ) ); ?></code>
+						<button type="button" class="button button-small" onclick="navigator.clipboard.writeText('<?php echo esc_js( admin_url( 'options-general.php?page=wpcusn&action=oauth_callback' ) ); ?>'); alert('<?php esc_html_e( 'Redirect URI copied to clipboard!', 'wpcusn' ); ?>');" style="margin-top: 5px;">
+							<?php esc_html_e( 'Copy', 'wpcusn' ); ?>
+						</button>
+						<br />
+						<small><?php esc_html_e( 'Add this URL to your ClickUp app\'s Redirect URL(s) field.', 'wpcusn' ); ?></small>
+					</p>
 					<?php if ( $client_id && $client_secret && ! $is_connected ) : ?>
 						<p>
 							<?php
@@ -72,10 +81,6 @@ $webhook_url = rest_url( 'clickup/v1/webhook' );
 									<?php esc_html_e( 'Connect to ClickUp', 'wpcusn' ); ?>
 								</a>
 							<?php endif; ?>
-						</p>
-						<p class="description">
-							<?php esc_html_e( 'Redirect URI:', 'wpcusn' ); ?>
-							<code><?php echo esc_url( admin_url( 'options-general.php?page=wpcusn&action=oauth_callback' ) ); ?></code>
 						</p>
 					<?php endif; ?>
 				</td>

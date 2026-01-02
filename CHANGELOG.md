@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed plugin update checker initialization error (Puc_v4_Factory not found)
 - Updated to use correct namespaced factory class for plugin-update-checker v5.6
 - Fixed GitHub URI header format (changed from "GitHub Plugin URI" to "GitHub URI" for library compatibility)
+- Always show OAuth redirect URI in settings (previously only shown when not connected)
+- Added copy button for redirect URI to make ClickUp app setup easier
+- Reduced update check period from 12 hours to 1 hour for faster update detection
 
 ## [1.0.0] - 2026-01-02
 
