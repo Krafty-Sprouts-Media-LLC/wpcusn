@@ -50,6 +50,7 @@ class WPCUSN_Settings_Page {
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_notices', array( $this, 'show_admin_notices' ) );
 		add_action( 'wp_ajax_wpcusn_get_spaces', array( $this, 'ajax_get_spaces' ) );
+		add_action( 'admin_post_wpcusn_disconnect', array( $this, 'handle_disconnect' ) );
 	}
 
 	/**
@@ -86,13 +87,7 @@ class WPCUSN_Settings_Page {
 		// List ID (optional, for limiting search to specific list)
 		register_setting( 'wpcusn_settings', 'wpcusn_list_id' );
 
-		// Handle disconnect
-		if ( isset( $_POST['wpcusn_disconnect'] ) && check_admin_referer( 'wpcusn_disconnect' ) ) {
-			$oauth = WPCUSN_ClickUp_OAuth::get_instance();
-			$oauth->disconnect();
-			wp_safe_redirect( admin_url( 'options-general.php?page=wpcusn&disconnected=1' ) );
-			exit;
-		}
+		// Handle disconnect moved to separate handler
 
 		// Handle webhook creation
 		if ( isset( $_POST['wpcusn_action'] ) && 'create_webhook' === $_POST['wpcusn_action'] && check_admin_referer( 'wpcusn_create_webhook' ) ) {
@@ -169,6 +164,24 @@ class WPCUSN_Settings_Page {
 	 */
 	public function render_settings_page() {
 		include WPCUSN_PLUGIN_DIR . 'admin/views/settings-page.php';
+	}
+
+	/**
+	 * Handle disconnect action
+	 *
+	 * @since 1.0.8
+	 */
+	public function handle_disconnect() {
+		check_admin_referer( 'wpcusn_disconnect', 'wpcusn_disconnect_nonce' );
+		
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( __( 'Unauthorized', 'wpcusn' ) );
+		}
+		
+		$oauth = WPCUSN_ClickUp_OAuth::get_instance();
+		$oauth->disconnect();
+		wp_safe_redirect( admin_url( 'options-general.php?page=wpcusn&disconnected=1' ) );
+		exit;
 	}
 
 	/**

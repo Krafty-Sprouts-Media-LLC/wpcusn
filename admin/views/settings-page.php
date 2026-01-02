@@ -82,13 +82,13 @@ $logs = array_slice( array_reverse( $logs ), 0, 50 ); // Last 50 entries
 					<?php if ( $is_connected ) : ?>
 						<p>
 							<span style="color: green;">✓ <?php esc_html_e( 'Connected to ClickUp', 'wpcusn' ); ?></span>
-							<form method="post" action="" style="display: inline;">
-								<?php wp_nonce_field( 'wpcusn_disconnect' ); ?>
-								<input type="hidden" name="wpcusn_disconnect" value="1" />
-								<button type="submit" class="button" style="margin-left: 10px;">
-									<?php esc_html_e( 'Disconnect', 'wpcusn' ); ?>
-								</button>
-							</form>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display: inline;">
+							<input type="hidden" name="action" value="wpcusn_disconnect" />
+							<?php wp_nonce_field( 'wpcusn_disconnect', 'wpcusn_disconnect_nonce' ); ?>
+							<button type="submit" class="button" style="margin-left: 10px;">
+								<?php esc_html_e( 'Disconnect', 'wpcusn' ); ?>
+							</button>
+						</form>
 						</p>
 					<?php endif; ?>
 				</td>

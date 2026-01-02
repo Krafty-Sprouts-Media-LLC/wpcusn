@@ -3,7 +3,7 @@
  * Plugin Name: WPCUSN - WordPress ClickUp Sync-nator
  * Plugin URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
  * Description: Two-way status synchronization between WordPress and ClickUp
- * Version: 1.0.8
+ * Version: 1.0.9
  * Author: Krafty Sprouts Media, LLC
  * Author URI: https://animalofthings.com
  * GitHub URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants
-define( 'WPCUSN_VERSION', '1.0.8' );
+define( 'WPCUSN_VERSION', '1.0.9' );
 define( 'WPCUSN_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPCUSN_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPCUSN_PLUGIN_FILE', __FILE__ );
