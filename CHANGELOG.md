@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed OAuth authorization URL endpoint (changed from `/api/v2/oauth` to `/api` per ClickUp documentation)
+- Fixed OAuth token exchange endpoint (changed from `app.clickup.com` to `api.clickup.com`)
 - Fixed double-encoding of redirect_uri parameter
+- Improved OAuth error handling with better error messages and logging
 - OAuth authorization URL now correctly uses `https://app.clickup.com/api?` endpoint
 
 ## [1.0.2] - 2026-01-02

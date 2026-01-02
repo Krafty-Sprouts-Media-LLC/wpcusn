@@ -32,7 +32,7 @@ class WPCUSN_ClickUp_OAuth {
 	 *
 	 * @var string
 	 */
-	private $oauth_base = 'https://app.clickup.com/api/v2/oauth/token';
+	private $oauth_base = 'https://api.clickup.com/api/v2/oauth/token';
 
 	/**
 	 * Get singleton instance
@@ -167,6 +167,7 @@ class WPCUSN_ClickUp_OAuth {
 			return $response;
 		}
 
+		$status_code = wp_remote_retrieve_response_code( $response );
 		$body = wp_remote_retrieve_body( $response );
 		$data = json_decode( $body, true );
 
@@ -174,8 +175,20 @@ class WPCUSN_ClickUp_OAuth {
 			return $data;
 		}
 
-		$error = isset( $data['error'] ) ? $data['error'] : 'Unknown error';
-		return new WP_Error( 'oauth_error', $error );
+		// Better error handling
+		$error_message = 'Unknown error';
+		if ( isset( $data['error'] ) ) {
+			$error_message = $data['error'];
+		} elseif ( isset( $data['err'] ) ) {
+			$error_message = $data['err'];
+		} elseif ( ! empty( $body ) ) {
+			$error_message = 'Response: ' . $body;
+		}
+
+		// Log the error for debugging
+		error_log( 'WPCUSN OAuth Error: ' . $error_message . ' | Status: ' . $status_code . ' | Body: ' . $body );
+
+		return new WP_Error( 'oauth_error', $error_message, array( 'status' => $status_code, 'response' => $data ) );
 	}
 
 	/**
