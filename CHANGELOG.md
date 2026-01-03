@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 03/01/2026
+### Added
+- **Automatic Settings Save:** Settings now save automatically as you type or change values - no more "Save" buttons!
+- **Visual Save Indicator:** A subtle floating indicator shows "Saving..." and "Saved ✓" status in the top-right corner.
+- **Smart Debouncing:** Changes are saved after 1 second of inactivity to prevent excessive save requests.
+- **AJAX-Based Saving:** All saves happen seamlessly in the background without page reload.
+
+### Removed
+- **Save Buttons:** Removed all "Save Changes" buttons from the settings page - they're no longer needed!
+
+### Changed
+- Settings page now provides instant feedback when changes are detected and saved.
+
+### Fixed
+- **Webhook URL Helper Text:** Restored missing helper text below webhook URL field explaining its purpose.
+
+## [1.3.0] - 02/01/2026
+### Added
+- **New Premium Dashboard:** Completely redesigned the settings page with a modern "Clean SaaS" aesthetic.
+- **Terminal-Style Logs:** New dark-mode console for viewing sync logs with enhanced readability and badge indicators.
+- **Visual Sync Config:** Replaced checkboxes with interactive toggle switches and clearer status mapping visuals.
+- **Smart Context Panel:** Improved Space and List selection with "Load Spaces" functionality and manual fallback.
+- **Webpack Free Assets:** New dedicated CSS/JS assets for the admin panel (`wpcusn-admin.css`, `wpcusn-admin.js`).
+
+### Fixed
+- **Typography:** Updated to use local fonts (Space Grotesk & DM Sans) to prevent loading issues and ensure consistency.
+- **UI Alignment:** Fixed icon alignment issues in warning messages and settings panels.
+- **UI Branding:** Corrected plugin title to "WP ClickUp Sync-nator" in the settings dashboard.
+- **Log Viewer:** Fixed layout issue where empty log messages would wrap incorrectly in the terminal view.
+- **Asset Loading:** Fixed dependency issues where fonts were not loading correctly in the admin dashboard.
+- **Detailed Legend:** Enhanced status mapping legend with two-column layout and SVG arrows.
+
 ## [1.2.8] - 02/01/2026
 
 ### Changed

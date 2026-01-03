@@ -54,7 +54,49 @@ class WPCUSN_Settings_Page
 		add_action('admin_post_wpcusn_save_settings', array($this, 'handle_settings_save'));
 		add_action('admin_notices', array($this, 'show_admin_notices'));
 		add_action('wp_ajax_wpcusn_get_spaces', array($this, 'ajax_get_spaces'));
+		add_action('wp_ajax_wpcusn_autosave_settings', array($this, 'ajax_autosave_settings'));
 		add_action('admin_post_wpcusn_disconnect', array($this, 'handle_disconnect'));
+
+		add_action('admin_enqueue_scripts', array($this, 'enqueue_assets'));
+	}
+
+	/**
+	 * Enqueue admin assets
+	 *
+	 * @since 1.3.0
+	 */
+	public function enqueue_assets($hook)
+	{
+		// Only load on our settings page
+		if (strpos($hook, 'wpcusn') === false) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'wpcusn-fonts',
+			WPCUSN_PLUGIN_URL . 'admin/assets/css/fonts.css',
+			array(),
+			WPCUSN_VERSION
+		);
+
+		wp_enqueue_style(
+			'wpcusn-admin-css',
+			WPCUSN_PLUGIN_URL . 'admin/assets/css/wpcusn-admin.css',
+			array('wpcusn-fonts'),
+			WPCUSN_VERSION . '.' . time() // Bust cache
+		);
+
+		wp_enqueue_script(
+			'wpcusn-admin-js',
+			WPCUSN_PLUGIN_URL . 'admin/assets/js/wpcusn-admin.js',
+			array('jquery'),
+			WPCUSN_VERSION,
+			true
+		);
+
+		wp_localize_script('wpcusn-admin-js', 'wpcusn_vars', array(
+			'nonce' => wp_create_nonce('wpcusn_get_spaces')
+		));
 	}
 
 	/**
@@ -466,6 +508,48 @@ class WPCUSN_Settings_Page
 		}
 
 		wp_send_json_success(array('spaces' => $all_spaces));
+	}
+
+	/**
+	 * AJAX handler for auto-save settings
+	 *
+	 * @since 1.3.1
+	 */
+	public function ajax_autosave_settings()
+	{
+		// Verify nonce
+		if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'wpcusn_get_spaces')) {
+			wp_send_json_error(array('message' => __('Security check failed', 'wpcusn')));
+		}
+
+		// Check permissions
+		if (!current_user_can('manage_options')) {
+			wp_send_json_error(array('message' => __('Unauthorized', 'wpcusn')));
+		}
+
+		// Parse form data
+		parse_str($_POST['form_data'], $form_data);
+
+		// Save settings
+		$settings = array(
+			'wpcusn_oauth_client_id' => isset($form_data['wpcusn_oauth_client_id']) ? sanitize_text_field($form_data['wpcusn_oauth_client_id']) : '',
+			'wpcusn_oauth_client_secret' => isset($form_data['wpcusn_oauth_client_secret']) ? sanitize_text_field($form_data['wpcusn_oauth_client_secret']) : '',
+			'wpcusn_api_key' => isset($form_data['wpcusn_api_key']) ? sanitize_text_field($form_data['wpcusn_api_key']) : '',
+			'wpcusn_space_id' => isset($form_data['wpcusn_space_id']) ? sanitize_text_field($form_data['wpcusn_space_id']) : '',
+			'wpcusn_team_id' => isset($form_data['wpcusn_team_id']) ? sanitize_text_field($form_data['wpcusn_team_id']) : '',
+			'wpcusn_list_id' => isset($form_data['wpcusn_list_id']) ? sanitize_text_field($form_data['wpcusn_list_id']) : '',
+			'wpcusn_sync_wp_to_clickup' => isset($form_data['wpcusn_sync_wp_to_clickup']) ? 1 : 0,
+			'wpcusn_sync_clickup_to_wp' => isset($form_data['wpcusn_sync_clickup_to_wp']) ? 1 : 0,
+			'wpcusn_include_closed_tasks' => isset($form_data['wpcusn_include_closed_tasks']) ? 1 : 0,
+			'wpcusn_log_limit' => isset($form_data['wpcusn_log_limit']) ? absint($form_data['wpcusn_log_limit']) : 200,
+			'wpcusn_log_retention_days' => isset($form_data['wpcusn_log_retention_days']) ? absint($form_data['wpcusn_log_retention_days']) : 7,
+		);
+
+		foreach ($settings as $key => $value) {
+			update_option($key, $value);
+		}
+
+		wp_send_json_success(array('message' => __('Settings saved', 'wpcusn')));
 	}
 }
 
