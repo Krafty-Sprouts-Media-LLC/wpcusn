@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 03/01/2026
+
+### Added
+- **Scheduled Auto-Linking Cron Job:** Added a cron job that runs twice daily to automatically link unlinked posts to ClickUp tasks. Checks posts with statuses: draft, ready, schedulable, scheduled, and pending. Processes up to 50 posts per run to avoid timeouts.
+- **Cron Logging:** Cron job start and completion are logged in the sync log with counts of processed and successfully linked posts.
+
+### Changed
+- Auto-linking now happens both on post save/page load AND periodically via scheduled cron job, ensuring posts are linked even if they were created before the plugin was installed or if slugs were updated later.
+
 ## [1.3.2] - 03/01/2026
 
 ### Fixed

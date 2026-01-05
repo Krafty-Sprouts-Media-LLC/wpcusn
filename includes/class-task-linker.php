@@ -47,6 +47,14 @@ class WPCUSN_Task_Linker {
 	 */
 	private function __construct() {
 		add_action( 'save_post', array( $this, 'auto_link_task' ), 10, 2 );
+		
+		// Schedule cron job for periodic auto-linking
+		add_action( 'wpcusn_cron_auto_link', array( $this, 'cron_auto_link_posts' ) );
+		
+		// Schedule the cron event if not already scheduled
+		if ( ! wp_next_scheduled( 'wpcusn_cron_auto_link' ) ) {
+			wp_schedule_event( time(), 'twicedaily', 'wpcusn_cron_auto_link' );
+		}
 	}
 
 	/**
@@ -298,6 +306,110 @@ class WPCUSN_Task_Linker {
 			$logs = array_slice( $logs, -50 );
 		}
 		update_option( 'wpcusn_sync_logs', $logs );
+	}
+
+	/**
+	 * Cron job to auto-link unlinked posts
+	 * Checks posts with statuses: draft, ready, schedulable, scheduled, pending
+	 *
+	 * @since 1.3.3
+	 */
+	public function cron_auto_link_posts() {
+		// Get space ID (primary) or list ID (fallback)
+		$space_id = get_option( 'wpcusn_space_id' );
+		$list_id = get_option( 'wpcusn_list_id' );
+
+		if ( ! $space_id && ! $list_id ) {
+			return;
+		}
+
+		// Statuses to check for auto-linking
+		$statuses = array( 'draft', 'ready', 'schedulable', 'scheduled', 'pending' );
+
+		// Query for unlinked posts with these statuses
+		$args = array(
+			'post_type'      => 'post',
+			'post_status'    => $statuses,
+			'posts_per_page' => 50, // Process in batches to avoid timeout
+			'meta_query'     => array(
+				array(
+					'key'     => '_clickup_task_id',
+					'compare' => 'NOT EXISTS',
+				),
+			),
+			'fields'         => 'ids',
+		);
+
+		$unlinked_posts = get_posts( $args );
+		$linked_count = 0;
+		$processed_count = 0;
+
+		// Log cron start
+		$logs = get_option( 'wpcusn_sync_logs', array() );
+		$logs[] = array(
+			'post_id'    => 0,
+			'task_id'    => '',
+			'direction'  => 'cron_auto_link_start',
+			'old_status' => 'Cron job started',
+			'new_status' => sprintf( 'Found %d unlinked posts to process', count( $unlinked_posts ) ),
+			'success'    => null,
+			'timestamp'  => current_time( 'mysql' ),
+		);
+
+		foreach ( $unlinked_posts as $post_id ) {
+			$post = get_post( $post_id );
+			if ( ! $post || ! $post->post_name ) {
+				continue;
+			}
+
+			$processed_count++;
+
+			// Check if already linked (double-check in case it was linked between query and processing)
+			$existing_task_id = get_post_meta( $post_id, '_clickup_task_id', true );
+			if ( $existing_task_id ) {
+				continue;
+			}
+
+			// Attempt to auto-link
+			$this->auto_link_task( $post_id, $post );
+
+			// Check if it was successfully linked
+			$new_task_id = get_post_meta( $post_id, '_clickup_task_id', true );
+			if ( $new_task_id ) {
+				$linked_count++;
+			}
+		}
+
+		// Log cron completion
+		$logs[] = array(
+			'post_id'    => 0,
+			'task_id'    => '',
+			'direction'  => 'cron_auto_link_complete',
+			'old_status' => sprintf( 'Processed %d posts', $processed_count ),
+			'new_status' => sprintf( 'Successfully linked %d posts', $linked_count ),
+			'success'    => true,
+			'timestamp'  => current_time( 'mysql' ),
+		);
+
+		// Apply log limit
+		$log_limit = get_option( 'wpcusn_max_log_entries', 200 );
+		if ( count( $logs ) > $log_limit ) {
+			$logs = array_slice( $logs, -$log_limit );
+		}
+		update_option( 'wpcusn_sync_logs', $logs );
+	}
+
+	/**
+	 * Clear scheduled cron event
+	 * Called on plugin deactivation
+	 *
+	 * @since 1.3.3
+	 */
+	public static function clear_cron() {
+		$timestamp = wp_next_scheduled( 'wpcusn_cron_auto_link' );
+		if ( $timestamp ) {
+			wp_unschedule_event( $timestamp, 'wpcusn_cron_auto_link' );
+		}
 	}
 }
 
