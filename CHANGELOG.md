@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 03/01/2026
+
+### Fixed
+- **Metabox UI Bug:** Fixed issue where metabox showed "No ClickUp task linked" even after successfully linking a task. Metabox now updates dynamically without requiring a page reload, allowing users to continue editing without losing unsaved changes.
+- **Auto-Link Experience:** Improved user experience by eliminating unnecessary page reloads when linking tasks manually or via auto-link.
+
 ## [1.3.1] - 03/01/2026
 ### Added
 - **Automatic Settings Save:** Settings now save automatically as you type or change values - no more "Save" buttons!
