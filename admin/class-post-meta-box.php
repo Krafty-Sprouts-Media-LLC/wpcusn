@@ -142,6 +142,7 @@ class WPCUSN_Post_Meta_Box
 		wp_nonce_field('wpcusn_meta_box', 'wpcusn_meta_box_nonce');
 		?>
 
+		<div id="wpcusn-metabox-content">
 		<?php if ($task_id): ?>
 			<p>
 				<strong><?php esc_html_e('Linked Task:', 'wpcusn'); ?></strong><br />
@@ -186,6 +187,7 @@ class WPCUSN_Post_Meta_Box
 			</p>
 			<div id="wpcusn-link-message"></div>
 		<?php endif; ?>
+		</div>
 
 		<script>
 			jQuery(document).ready(function ($) {
@@ -254,17 +256,94 @@ class WPCUSN_Post_Meta_Box
 							post_id: postId,
 							nonce: '<?php echo esc_js(wp_create_nonce('wpcusn_try_auto_link')); ?>'
 						},
-						success: function (response) {
-							if (response.success) {
-								$('#wpcusn-link-message').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
-								if (response.data.linked) {
-									setTimeout(function () { location.reload(); }, 1500);
+					success: function (response) {
+						if (response.success) {
+							if (response.data.linked && response.data.task_id) {
+								// Update metabox content immediately without page reload
+								var taskName = response.data.task_name || response.data.task_id;
+								var linkedAt = response.data.linked_at || '';
+								var metaboxContent = '<p><strong><?php esc_html_e('Linked Task:', 'wpcusn'); ?></strong><br />' + 
+									$('<div>').text(taskName).html() + '</p>';
+								if (linkedAt) {
+									metaboxContent += '<p><small><?php esc_html_e('Linked:', 'wpcusn'); ?> ' + 
+										$('<div>').text(linkedAt).html() + '</small></p>';
 								}
+								metaboxContent += '<p>' +
+									'<button type="button" class="button" id="wpcusn-force-sync" data-post-id="' + postId + '">' +
+									'<?php esc_html_e('Force Sync Now', 'wpcusn'); ?>' +
+									'</button> ' +
+									'<button type="button" class="button" id="wpcusn-unlink-task" data-post-id="' + postId + '">' +
+									'<?php esc_html_e('Unlink Task', 'wpcusn'); ?>' +
+									'</button>' +
+									'</p>' +
+									'<div id="wpcusn-sync-message"></div>';
+								
+								// Replace the entire metabox content
+								$('#wpcusn-metabox-content').html(metaboxContent);
+								
+								// Show success message temporarily
+								$('#wpcusn-sync-message').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
+								
+								// Re-attach event handlers for the new buttons
+								$('#wpcusn-force-sync').on('click', function () {
+									var postId = $(this).data('post-id');
+									var button = $(this);
+									button.prop('disabled', true).text('<?php esc_html_e('Syncing...', 'wpcusn'); ?>');
+
+									$.ajax({
+										url: ajaxurl,
+										type: 'POST',
+										data: {
+											action: 'wpcusn_force_sync',
+											post_id: postId,
+											nonce: '<?php echo esc_js(wp_create_nonce('wpcusn_force_sync')); ?>'
+										},
+										success: function (response) {
+											if (response.success) {
+												$('#wpcusn-sync-message').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
+											} else {
+												$('#wpcusn-sync-message').html('<div class="notice notice-error"><p>' + response.data.message + '</p></div>');
+											}
+											button.prop('disabled', false).text('<?php esc_html_e('Force Sync Now', 'wpcusn'); ?>');
+										}
+									});
+								});
+
+								$('#wpcusn-unlink-task').on('click', function () {
+									if (!confirm('<?php esc_html_e('Are you sure you want to unlink this task?', 'wpcusn'); ?>')) {
+										return;
+									}
+
+									var postId = $(this).data('post-id');
+									var button = $(this);
+									button.prop('disabled', true);
+
+									$.ajax({
+										url: ajaxurl,
+										type: 'POST',
+										data: {
+											action: 'wpcusn_unlink_task',
+											post_id: postId,
+											nonce: '<?php echo esc_js(wp_create_nonce('wpcusn_unlink_task')); ?>'
+										},
+										success: function (response) {
+											if (response.success) {
+												location.reload();
+											} else {
+												alert(response.data.message);
+												button.prop('disabled', false);
+											}
+										}
+									});
+								});
 							} else {
-								$('#wpcusn-link-message').html('<div class="notice notice-error"><p>' + response.data.message + '</p></div>');
+								$('#wpcusn-link-message').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
 							}
-							button.prop('disabled', false).text('<?php esc_html_e('Try Auto-Link Now', 'wpcusn'); ?>');
+						} else {
+							$('#wpcusn-link-message').html('<div class="notice notice-error"><p>' + response.data.message + '</p></div>');
 						}
+						button.prop('disabled', false).text('<?php esc_html_e('Try Auto-Link Now', 'wpcusn'); ?>');
+					}
 					});
 				});
 
@@ -289,15 +368,94 @@ class WPCUSN_Post_Meta_Box
 							task_id: taskId,
 							nonce: '<?php echo esc_js(wp_create_nonce('wpcusn_link_task')); ?>'
 						},
-						success: function (response) {
-							if (response.success) {
-								$('#wpcusn-link-message').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
-								setTimeout(function () { location.reload(); }, 1500);
+					success: function (response) {
+						if (response.success) {
+							if (response.data.linked && response.data.task_id) {
+								// Update metabox content immediately without page reload
+								var taskName = response.data.task_name || response.data.task_id;
+								var linkedAt = response.data.linked_at || '';
+								var metaboxContent = '<p><strong><?php esc_html_e('Linked Task:', 'wpcusn'); ?></strong><br />' + 
+									$('<div>').text(taskName).html() + '</p>';
+								if (linkedAt) {
+									metaboxContent += '<p><small><?php esc_html_e('Linked:', 'wpcusn'); ?> ' + 
+										$('<div>').text(linkedAt).html() + '</small></p>';
+								}
+								metaboxContent += '<p>' +
+									'<button type="button" class="button" id="wpcusn-force-sync" data-post-id="' + postId + '">' +
+									'<?php esc_html_e('Force Sync Now', 'wpcusn'); ?>' +
+									'</button> ' +
+									'<button type="button" class="button" id="wpcusn-unlink-task" data-post-id="' + postId + '">' +
+									'<?php esc_html_e('Unlink Task', 'wpcusn'); ?>' +
+									'</button>' +
+									'</p>' +
+									'<div id="wpcusn-sync-message"></div>';
+								
+								// Replace the entire metabox content
+								$('#wpcusn-metabox-content').html(metaboxContent);
+								
+								// Show success message temporarily
+								$('#wpcusn-sync-message').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
+								
+								// Re-attach event handlers for the new buttons
+								$('#wpcusn-force-sync').on('click', function () {
+									var postId = $(this).data('post-id');
+									var button = $(this);
+									button.prop('disabled', true).text('<?php esc_html_e('Syncing...', 'wpcusn'); ?>');
+
+									$.ajax({
+										url: ajaxurl,
+										type: 'POST',
+										data: {
+											action: 'wpcusn_force_sync',
+											post_id: postId,
+											nonce: '<?php echo esc_js(wp_create_nonce('wpcusn_force_sync')); ?>'
+										},
+										success: function (response) {
+											if (response.success) {
+												$('#wpcusn-sync-message').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
+											} else {
+												$('#wpcusn-sync-message').html('<div class="notice notice-error"><p>' + response.data.message + '</p></div>');
+											}
+											button.prop('disabled', false).text('<?php esc_html_e('Force Sync Now', 'wpcusn'); ?>');
+										}
+									});
+								});
+
+								$('#wpcusn-unlink-task').on('click', function () {
+									if (!confirm('<?php esc_html_e('Are you sure you want to unlink this task?', 'wpcusn'); ?>')) {
+										return;
+									}
+
+									var postId = $(this).data('post-id');
+									var button = $(this);
+									button.prop('disabled', true);
+
+									$.ajax({
+										url: ajaxurl,
+										type: 'POST',
+										data: {
+											action: 'wpcusn_unlink_task',
+											post_id: postId,
+											nonce: '<?php echo esc_js(wp_create_nonce('wpcusn_unlink_task')); ?>'
+										},
+										success: function (response) {
+											if (response.success) {
+												location.reload();
+											} else {
+												alert(response.data.message);
+												button.prop('disabled', false);
+											}
+										}
+									});
+								});
 							} else {
-								$('#wpcusn-link-message').html('<div class="notice notice-error"><p>' + response.data.message + '</p></div>');
-								button.prop('disabled', false).text('<?php esc_html_e('Link Task', 'wpcusn'); ?>');
+								$('#wpcusn-link-message').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
 							}
+						} else {
+							$('#wpcusn-link-message').html('<div class="notice notice-error"><p>' + response.data.message + '</p></div>');
+							button.prop('disabled', false).text('<?php esc_html_e('Link Task', 'wpcusn'); ?>');
 						}
+					}
 					});
 				});
 			});
@@ -390,9 +548,13 @@ class WPCUSN_Post_Meta_Box
 		$new_task_id = get_post_meta($post_id, '_clickup_task_id', true);
 		if ($new_task_id) {
 			$task_name = get_post_meta($post_id, '_clickup_task_name', true);
+			$linked_at = get_post_meta($post_id, '_clickup_linked_at', true);
 			wp_send_json_success(array(
 				'message' => sprintf(__('Successfully linked to task: %s (%s)', 'wpcusn'), $task_name, $new_task_id),
-				'linked' => true
+				'linked' => true,
+				'task_id' => $new_task_id,
+				'task_name' => $task_name,
+				'linked_at' => $linked_at
 			));
 		} else {
 			wp_send_json_error(array('message' => __('No matching task found. Check the sync log for details.', 'wpcusn')));
@@ -427,8 +589,13 @@ class WPCUSN_Post_Meta_Box
 		}
 
 		$task_name = get_post_meta($post_id, '_clickup_task_name', true);
+		$linked_at = get_post_meta($post_id, '_clickup_linked_at', true);
 		wp_send_json_success(array(
-			'message' => sprintf(__('Successfully linked to task: %s (%s)', 'wpcusn'), $task_name ?: $task_id, $task_id)
+			'message' => sprintf(__('Successfully linked to task: %s (%s)', 'wpcusn'), $task_name ?: $task_id, $task_id),
+			'linked' => true,
+			'task_id' => $task_id,
+			'task_name' => $task_name ?: $task_id,
+			'linked_at' => $linked_at
 		));
 	}
 }
