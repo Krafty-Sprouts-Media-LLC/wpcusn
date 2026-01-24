@@ -533,3 +533,14 @@ input:checked+.wpcusn-slider:before {
     position: relative;
     top: -1px;
 }
+
+/* Form Footer */
+.wpcusn-form-footer {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--wpcusn-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    clear: both;
+}

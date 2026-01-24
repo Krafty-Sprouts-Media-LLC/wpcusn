@@ -474,6 +474,13 @@ $logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
 			</div>
 
 		</div>
+
+		<!-- FORM FOOTER WITH SAVE BUTTON -->
+		<div class="wpcusn-form-footer">
+			<button type="submit" class="wpcusn-btn wpcusn-btn-primary" style="min-width: 120px;">
+				<?php esc_html_e('Save Settings', 'wpcusn'); ?>
+			</button>
+		</div>
 	</form>
 
 	<!-- WEBHOOK ACTIONS (Self-contained forms) -->
