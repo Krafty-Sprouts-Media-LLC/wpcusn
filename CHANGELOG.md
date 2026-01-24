@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 24/01/2026
+
+### Fixed
+- **Webhook Creation Button:** Fixed "Create Webhook Automatically" button not responding. Added missing form IDs and fixed malformed SweetAlert2 script tag. Button now properly submits webhook creation form.
+
 ## [1.3.4] - 24/01/2026
 
 ### Fixed

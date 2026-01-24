@@ -26,12 +26,26 @@ $logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
 ?>
 
 <!-- SweetAlert2 -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11">	// Webhook Actions Proxies
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+	// Webhook Actions Proxies
 	function triggerCreateWebhook() {
-		document.getElementById('wpcusn-create-webhook-form').submit();
+		var form = document.getElementById('wpcusn-create-webhook-form');
+		if (!form) {
+			console.error('WPCUSN: Create webhook form not found');
+			alert('<?php esc_html_e("Error: Webhook form not found. Please refresh the page.", "wpcusn"); ?>');
+			return;
+		}
+		form.submit();
 	}
 
 	function triggerDeleteWebhook() {
+		var form = document.getElementById('wpcusn-delete-webhook-form');
+		if (!form) {
+			console.error('WPCUSN: Delete webhook form not found');
+			alert('<?php esc_html_e("Error: Webhook form not found. Please refresh the page.", "wpcusn"); ?>');
+			return;
+		}
 		Swal.fire({
 			title: '<?php esc_html_e("Delete Webhook?", "wpcusn"); ?>',
 			text: "<?php esc_html_e("This will stop ClickUp from syncing updates to WordPress.", "wpcusn"); ?>",
@@ -43,7 +57,7 @@ $logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
 			cancelButtonText: '<?php esc_html_e("Cancel", "wpcusn"); ?>'
 		}).then((result) => {
 			if (result.isConfirmed) {
-				document.getElementById('wpcusn-delete-webhook-form').submit();
+				form.submit();
 			}
 		});
 	}
@@ -487,7 +501,7 @@ $logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
 	<?php if (($is_connected || $api_key) && $space_id): ?>
 		<div style="display: none;">
 			<?php if (!$webhook_id): ?>
-				<form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
+				<form id="wpcusn-create-webhook-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
 					<input type="hidden" name="action" value="wpcusn_save_settings" />
 					<?php wp_nonce_field('wpcusn_save_settings', 'wpcusn_settings_nonce'); ?>
 					<?php wp_nonce_field('wpcusn_create_webhook', '_wpnonce'); ?>
@@ -495,7 +509,7 @@ $logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
 					<!-- Button removed for proxy -->
 				</form>
 			<?php else: ?>
-				<form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
+				<form id="wpcusn-delete-webhook-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
 					<input type="hidden" name="action" value="wpcusn_save_settings" />
 					<?php wp_nonce_field('wpcusn_save_settings', 'wpcusn_settings_nonce'); ?>
 					<?php wp_nonce_field('wpcusn_delete_webhook', '_wpnonce'); ?>
