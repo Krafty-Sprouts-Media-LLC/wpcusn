@@ -67,6 +67,7 @@ class WPCUSN_Status_Mapper
 			'ready' => 'READY',
 			'schedulable' => 'SCHEDULED',
 			'scheduled' => 'SCHEDULED',
+			'future' => 'SCHEDULED',
 			'publish' => 'PUBLISHED',
 		);
 

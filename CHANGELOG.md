@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.7] - 10/02/2026
+
+### Fixed
+- **Scheduled Posts:** Added mapping for standard WordPress `future` status to ClickUp `SCHEDULED`. This fixes errors where the plugin would fail to sync when tasks transitioned to the standard "Scheduled" state in WordPress.
+
 ## [1.3.6] - 10/02/2026
 
 ### Changed
