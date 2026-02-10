@@ -4,7 +4,7 @@ Tags: clickup, sync, wordpress, tasks, status
 Requires at least: 6.8
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 1.0.0
+Stable tag: 1.3.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,16 +60,18 @@ WPCUSN (WordPress ClickUp Sync-nator) enables seamless two-way synchronization o
 
 **WordPress → ClickUp:**
 * draft → IN PROGRESS
+* pending → PENDING (Review)
 * ready → READY
-* schedulable → PENDING
-* scheduled → PENDING
+* schedulable → SCHEDULED
+* scheduled → SCHEDULED
 * publish → PUBLISHED
 
 **ClickUp → WordPress:**
 * TO DO → draft
 * IN PROGRESS → draft
+* PENDING (Review) → pending
 * READY → ready
-* PENDING → schedulable
+* SCHEDULED → schedulable
 * PUBLISHED → publish
 
 == Frequently Asked Questions ==

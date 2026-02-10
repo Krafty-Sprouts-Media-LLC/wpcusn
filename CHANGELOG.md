@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.6] - 10/02/2026
+
+### Changed
+- **Status Mapping Update:** Aligned WordPress and ClickUp status mappings for stricter workflow control.
+  - `pending` (WP) now maps to `PENDING` (ClickUp) to represent "Pending Review" state.
+  - `schedulable` & `scheduled` (WP) now map to `SCHEDULED` (ClickUp).
+  - This change requires a "SCHEDULED" status to be created in ClickUp to separate it from the "PENDING" review state.
 ## [1.3.5] - 24/01/2026
 
 ### Fixed

@@ -63,9 +63,10 @@ class WPCUSN_Status_Mapper
 	{
 		$mapping = array(
 			'draft' => 'IN PROGRESS',
+			'pending' => 'PENDING',
 			'ready' => 'READY',
-			'schedulable' => 'PENDING',
-			'scheduled' => 'PENDING',
+			'schedulable' => 'SCHEDULED',
+			'scheduled' => 'SCHEDULED',
 			'publish' => 'PUBLISHED',
 		);
 
@@ -85,7 +86,8 @@ class WPCUSN_Status_Mapper
 			'TO DO' => 'draft',
 			'IN PROGRESS' => 'draft',
 			'READY' => 'ready',
-			'PENDING' => 'schedulable',
+			'PENDING' => 'pending',
+			'SCHEDULED' => 'schedulable',
 			'PUBLISHED' => 'publish',
 		);
 
