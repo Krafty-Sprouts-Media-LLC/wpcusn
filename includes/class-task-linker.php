@@ -71,6 +71,29 @@ class WPCUSN_Task_Linker {
 	}
 
 	/**
+	 * Normalize task name for comparison
+	 *
+	 * Makes matching more robust by ignoring case, extra whitespace,
+	 * and punctuation like question marks at the end of sentences.
+	 *
+	 * @since 1.3.8
+	 *
+	 * @param string $name Task name to normalize.
+	 * @return string Normalized task name.
+	 */
+	private function normalize_task_name( $name ) {
+		$name = strtolower( trim( (string) $name ) );
+
+		// Remove common punctuation characters to avoid mismatch on trailing symbols like "?"
+		$name = preg_replace( '/[[:punct:]]+/u', '', $name );
+
+		// Collapse multiple whitespace characters into a single space.
+		$name = preg_replace( '/\s+/u', ' ', $name );
+
+		return $name;
+	}
+
+	/**
 	 * Auto-link post to ClickUp task
 	 *
 	 * @since 1.0.0
@@ -123,13 +146,17 @@ class WPCUSN_Task_Linker {
 			return;
 		}
 
-		// Find exact match (case-insensitive)
+		// Find exact match using normalized comparison (case-insensitive, punctuation-insensitive)
 		$matched = false;
+		$search_normalized = $this->normalize_task_name( $task_name );
+
 		if ( isset( $result['tasks'] ) && is_array( $result['tasks'] ) ) {
 			foreach ( $result['tasks'] as $task ) {
-				// Match task name (case-insensitive)
+				// Match task name using normalized comparison.
 				$task_name_match = isset( $task['name'] ) ? $task['name'] : '';
-				if ( strcasecmp( $task_name_match, $task_name ) === 0 ) {
+				$task_name_normalized = $this->normalize_task_name( $task_name_match );
+
+				if ( $task_name_normalized === $search_normalized ) {
 					// Store task ID and list ID
 					update_post_meta( $post_id, '_clickup_task_id', $task['id'] );
 					update_post_meta( $post_id, '_clickup_task_name', $task['name'] );

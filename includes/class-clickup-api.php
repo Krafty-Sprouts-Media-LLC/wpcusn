@@ -203,8 +203,10 @@ class WPCUSN_ClickUp_API
 				$all_tasks = $result['tasks'];
 			}
 
-			// Filter tasks by case-insensitive name match
-			return $this->filter_tasks_by_name($all_tasks, $task_name);
+			// Filter tasks by case-insensitive name match with fuzzy fallback so
+			// tasks with minor punctuation differences (e.g., trailing "?") are
+			// still returned for final strict matching by the linker.
+			return $this->filter_tasks_by_name($all_tasks, $task_name, true);
 		}
 
 		// Use Get Filtered Team Tasks endpoint - searches across ALL folders and lists

@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WPCUSN_VERSION', '1.3.7');
+define('WPCUSN_VERSION', '1.3.8');
 define('WPCUSN_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WPCUSN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WPCUSN_PLUGIN_FILE', __FILE__);

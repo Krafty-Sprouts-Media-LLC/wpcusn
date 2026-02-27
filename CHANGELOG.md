@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.8] - 27/02/2026
+
+### Fixed
+- **Keyword Auto-Linking:** Improved task name matching so posts now auto-link correctly even when ClickUp task names include punctuation (for example, trailing question marks like "Can I shoot a dog on my property in California?"). Matching is now case-insensitive and punctuation-insensitive while still requiring a strict one-to-one match after normalization, preventing accidental links to similar but different keywords.
+
 ## [1.3.7] - 10/02/2026
 
 ### Fixed
