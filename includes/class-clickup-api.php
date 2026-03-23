@@ -294,7 +294,8 @@ class WPCUSN_ClickUp_API
 			foreach ($page_tasks as $task) {
 				if (isset($task['name'])) {
 					$task_lower = strtolower(trim($task['name']));
-					if ($task_lower === $search_lower) {
+					if ($task_lower === $search_lower ||
+						$this->normalize_for_match($task_lower) === $this->normalize_for_match($search_lower)) {
 						$this->log_api_debug("Team search: MATCH found on page {$page}! Returning early.");
 						return array('tasks' => array($task));
 					}
@@ -474,6 +475,10 @@ class WPCUSN_ClickUp_API
 				if ($task_lower === $search_lower) {
 					$filtered[] = $task;
 				}
+				// Normalized exact match - strips punctuation (e.g. "Neighbor's" → "Neighbors")
+				elseif ($this->normalize_for_match($task_lower) === $this->normalize_for_match($search_lower)) {
+					$filtered[] = $task;
+				}
 				// Partial match - task name contains search term
 				elseif (strpos($task_lower, $search_lower) !== false) {
 					$partial_match_tasks[] = $task;
@@ -502,6 +507,20 @@ class WPCUSN_ClickUp_API
 		}
 
 		return array('tasks' => $filtered);
+	}
+
+	/**
+	 * Normalize a task name for comparison by removing punctuation and collapsing whitespace.
+	 * Mirrors the normalization in WPCUSN_Task_Linker::normalize_task_name().
+	 *
+	 * @since 1.3.9
+	 * @param string $name Already-lowercased name to normalize.
+	 * @return string Normalized name.
+	 */
+	private function normalize_for_match($name)
+	{
+		$name = preg_replace('/[[:punct:]]+/u', '', $name);
+		return preg_replace('/\s+/u', ' ', trim($name));
 	}
 
 	/**
