@@ -193,53 +193,73 @@ class WPCUSN_ClickUp_API
 		// The API caps results at 100 tasks per page, so we must page through
 		// all results to avoid missing tasks in large lists.
 		if ($list_id) {
-			$all_tasks      = array();
-			$page           = 0;
-			$max_pages      = 50; // Guard against runaway loops (5000 tasks max)
-			$search_lower   = strtolower( trim( $task_name ) );
-			$include_closed = get_option( 'wpcusn_include_closed_tasks', false ) ? 'true' : 'false';
+			$all_tasks = array();
+			$page = 0;
+			$max_pages = 50; // Guard against runaway loops (5000 tasks max)
+			$search_lower = strtolower(trim($task_name));
+			$include_closed = get_option('wpcusn_include_closed_tasks', false) ? 'true' : 'false';
 
-			$this->log_api_debug( "List search: looking for '{$task_name}' in list {$list_id} (include_closed={$include_closed})" );
+			$this->log_api_debug("List search: looking for '{$task_name}' in list {$list_id} (include_closed={$include_closed})");
 
 			do {
-				$endpoint = "/list/{$list_id}/task?page={$page}&include_closed={$include_closed}";
-				$result   = $this->request( $endpoint );
+				// subtasks=true: keywords are often subtasks; default API response excludes them.
+				// include_timl=true: include tasks whose home list differs but appear on this list.
+				$endpoint = "/list/{$list_id}/task?page={$page}&include_closed={$include_closed}&subtasks=true&include_timl=true";
+				$result = $this->request($endpoint);
 
-				if ( is_wp_error( $result ) ) {
-					$this->log_api_debug( "List search error on page {$page}: " . $result->get_error_message() );
-					if ( empty( $all_tasks ) ) {
+				if (is_wp_error($result)) {
+					$this->log_api_debug("List search error on page {$page}: " . $result->get_error_message());
+					if (empty($all_tasks)) {
 						return $result;
 					}
 					break;
 				}
 
-				$page_tasks = isset( $result['tasks'] ) ? $result['tasks'] : array();
+				$page_tasks = isset($result['tasks']) ? $result['tasks'] : array();
 
 				// EARLY EXIT: return as soon as an exact/normalised match is found.
-				foreach ( $page_tasks as $task ) {
-					if ( isset( $task['name'] ) ) {
-						$task_lower = strtolower( trim( $task['name'] ) );
-						if ( $task_lower === $search_lower ||
-							$this->normalize_for_match( $task_lower ) === $this->normalize_for_match( $search_lower ) ) {
-							$this->log_api_debug( "List search: MATCH found on page {$page}! Returning early." );
-							return array( 'tasks' => array( $task ) );
+				foreach ($page_tasks as $task) {
+					if (isset($task['name'])) {
+						$task_lower = strtolower(trim($task['name']));
+						if (
+							$task_lower === $search_lower ||
+							$this->normalize_for_match($task_lower) === $this->normalize_for_match($search_lower)
+						) {
+							$this->log_api_debug("List search: MATCH found on page {$page}! Returning early.");
+							return array('tasks' => array($task));
 						}
 					}
 				}
 
-				$all_tasks = array_merge( $all_tasks, $page_tasks );
+				$all_tasks = array_merge($all_tasks, $page_tasks);
 
-				$has_more = count( $page_tasks ) >= 100;
+				$has_more = count($page_tasks) >= 100;
 				$page++;
 
-			} while ( $has_more && $page < $max_pages );
+			} while ($has_more && $page < $max_pages);
 
-			$this->log_api_debug( "List search complete: " . count( $all_tasks ) . " tasks scanned across {$page} page(s)" );
+			$this->log_api_debug("List search complete: " . count($all_tasks) . " tasks scanned across {$page} page(s)");
 
 			// Filter tasks with fuzzy fallback so tasks with minor punctuation
 			// differences (e.g., trailing "?") are still returned for final
 			// strict matching by the linker.
-			return $this->filter_tasks_by_name( $all_tasks, $task_name, true );
+			$filtered = $this->filter_tasks_by_name($all_tasks, $task_name, true);
+
+			if (!empty($filtered['tasks'])) {
+				return $filtered;
+			}
+
+			// List ID may point at the wrong list or tasks may only appear under space-wide search.
+			$configured_space_id = get_option('wpcusn_space_id');
+			if ($team_id && $configured_space_id) {
+				$this->log_api_debug('List search returned no matches; falling back to team/space search.');
+				$team_result = $this->search_tasks_in_team($team_id, $configured_space_id, $task_name);
+				if (!is_wp_error($team_result) && !empty($team_result['tasks'])) {
+					return $team_result;
+				}
+			}
+
+			return $filtered;
 		}
 
 		// Use Get Filtered Team Tasks endpoint - searches across ALL folders and lists
@@ -310,7 +330,7 @@ class WPCUSN_ClickUp_API
 		$this->log_api_debug("Team search: looking for '{$task_name}' (include_closed={$include_closed})");
 
 		do {
-			$endpoint = "/team/{$team_id}/task?page={$page}&space_ids[]={$space_id}&include_closed={$include_closed}";
+			$endpoint = "/team/{$team_id}/task?page={$page}&space_ids[]={$space_id}&include_closed={$include_closed}&subtasks=true";
 			$result = $this->request($endpoint);
 
 			if (is_wp_error($result)) {
@@ -327,8 +347,10 @@ class WPCUSN_ClickUp_API
 			foreach ($page_tasks as $task) {
 				if (isset($task['name'])) {
 					$task_lower = strtolower(trim($task['name']));
-					if ($task_lower === $search_lower ||
-						$this->normalize_for_match($task_lower) === $this->normalize_for_match($search_lower)) {
+					if (
+						$task_lower === $search_lower ||
+						$this->normalize_for_match($task_lower) === $this->normalize_for_match($search_lower)
+					) {
 						$this->log_api_debug("Team search: MATCH found on page {$page}! Returning early.");
 						return array('tasks' => array($task));
 					}

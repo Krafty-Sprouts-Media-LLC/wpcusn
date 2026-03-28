@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 28/03/2026
+
+### Fixed
+- **Auto-Link "Found 0 Tasks" When Task Exists in ClickUp:** The ClickUp Get Tasks API excludes **subtasks** by default and omits tasks in **multiple lists** unless `include_timl` is set. List-based search now requests `subtasks=true` and `include_timl=true`, and filtered team task search requests `subtasks=true`, so keyword tasks that are subtasks or multi-list still appear in results. If the configured List ID still yields no name match, the plugin falls back to team/space search when Space ID and Team ID are saved.
+
 ## [1.4.0] - 28/03/2026
 
 ### Fixed
