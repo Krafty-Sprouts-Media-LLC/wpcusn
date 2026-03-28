@@ -189,24 +189,57 @@ class WPCUSN_ClickUp_API
 		// Get team ID for the workspace-wide search endpoint
 		$team_id = get_option('wpcusn_team_id');
 
-		// If list_id is provided, search only that list (direct list query is fine)
+		// If list_id is provided, search only that list with full pagination.
+		// The API caps results at 100 tasks per page, so we must page through
+		// all results to avoid missing tasks in large lists.
 		if ($list_id) {
-			$endpoint = "/list/{$list_id}/task";
-			$result = $this->request($endpoint);
+			$all_tasks      = array();
+			$page           = 0;
+			$max_pages      = 50; // Guard against runaway loops (5000 tasks max)
+			$search_lower   = strtolower( trim( $task_name ) );
+			$include_closed = get_option( 'wpcusn_include_closed_tasks', false ) ? 'true' : 'false';
 
-			if (is_wp_error($result)) {
-				return $result;
-			}
+			$this->log_api_debug( "List search: looking for '{$task_name}' in list {$list_id} (include_closed={$include_closed})" );
 
-			$all_tasks = array();
-			if (isset($result['tasks']) && is_array($result['tasks'])) {
-				$all_tasks = $result['tasks'];
-			}
+			do {
+				$endpoint = "/list/{$list_id}/task?page={$page}&include_closed={$include_closed}";
+				$result   = $this->request( $endpoint );
 
-			// Filter tasks by case-insensitive name match with fuzzy fallback so
-			// tasks with minor punctuation differences (e.g., trailing "?") are
-			// still returned for final strict matching by the linker.
-			return $this->filter_tasks_by_name($all_tasks, $task_name, true);
+				if ( is_wp_error( $result ) ) {
+					$this->log_api_debug( "List search error on page {$page}: " . $result->get_error_message() );
+					if ( empty( $all_tasks ) ) {
+						return $result;
+					}
+					break;
+				}
+
+				$page_tasks = isset( $result['tasks'] ) ? $result['tasks'] : array();
+
+				// EARLY EXIT: return as soon as an exact/normalised match is found.
+				foreach ( $page_tasks as $task ) {
+					if ( isset( $task['name'] ) ) {
+						$task_lower = strtolower( trim( $task['name'] ) );
+						if ( $task_lower === $search_lower ||
+							$this->normalize_for_match( $task_lower ) === $this->normalize_for_match( $search_lower ) ) {
+							$this->log_api_debug( "List search: MATCH found on page {$page}! Returning early." );
+							return array( 'tasks' => array( $task ) );
+						}
+					}
+				}
+
+				$all_tasks = array_merge( $all_tasks, $page_tasks );
+
+				$has_more = count( $page_tasks ) >= 100;
+				$page++;
+
+			} while ( $has_more && $page < $max_pages );
+
+			$this->log_api_debug( "List search complete: " . count( $all_tasks ) . " tasks scanned across {$page} page(s)" );
+
+			// Filter tasks with fuzzy fallback so tasks with minor punctuation
+			// differences (e.g., trailing "?") are still returned for final
+			// strict matching by the linker.
+			return $this->filter_tasks_by_name( $all_tasks, $task_name, true );
 		}
 
 		// Use Get Filtered Team Tasks endpoint - searches across ALL folders and lists

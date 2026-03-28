@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 28/03/2026
+
+### Fixed
+- **Auto-Link Miss on Large Lists:** When a List ID is configured, the plugin was querying `/list/{id}/task` only once (max 100 results per page), so any task beyond the first 100 items was never seen and the link never formed. The list-based search path now paginates through all pages (same as the team-search path), respects the "Include Closed Tasks" setting, and uses the same early-exit optimisation — returning immediately when an exact or normalised match is found. This fixes cases like "Can You Drink Mocktails While Pregnant?" not linking even though the plugin reported it was searching for the correct slug.
+
 ## [1.3.8] - 27/02/2026
+
 
 ### Fixed
 - **Keyword Auto-Linking:** Improved task name matching so posts now auto-link correctly even when ClickUp task names include punctuation (for example, trailing question marks like "Can I shoot a dog on my property in California?"). Matching is now case-insensitive and punctuation-insensitive while still requiring a strict one-to-one match after normalization, preventing accidental links to similar but different keywords.

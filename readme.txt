@@ -4,7 +4,7 @@ Tags: clickup, sync, wordpress, tasks, status
 Requires at least: 6.8
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 1.3.7
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -93,6 +93,10 @@ The post will not be linked, but you can manually link it later or rename the Cl
 Currently, the plugin only works with the default "post" post type. Support for custom post types may be added in future versions.
 
 == Changelog ==
+
+= 1.4.0 =
+* Fixed: Auto-link now paginates through all pages when searching a specific List ID (previously only fetched first 100 tasks, causing misses on large lists)
+* Fixed: List-based search now respects the "Include Closed Tasks" setting
 
 = 1.0.0 =
 * Initial release
