@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 31/03/2026
+
+### Fixed
+- **Auto-Link Search Ceiling And Misleading Failure Logs:** Removed the hidden 50-page search cap from the main list and team search paths, so keyword discovery now continues until ClickUp has no more pages to return. Failed auto-link logs now report the real search diagnostics, including search path, pages scanned, tasks scanned, whether closed tasks were included, whether fallback search ran, and whether the scan exhausted all available pages.
+
 ## [1.4.1] - 28/03/2026
 
 ### Fixed

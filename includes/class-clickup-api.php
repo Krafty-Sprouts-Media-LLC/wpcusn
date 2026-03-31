@@ -190,63 +190,16 @@ class WPCUSN_ClickUp_API
 		$team_id = get_option('wpcusn_team_id');
 
 		// If list_id is provided, search only that list with full pagination.
-		// The API caps results at 100 tasks per page, so we must page through
-		// all results to avoid missing tasks in large lists.
 		if ($list_id) {
-			$all_tasks = array();
-			$page = 0;
-			$max_pages = 50; // Guard against runaway loops (5000 tasks max)
-			$search_lower = strtolower(trim($task_name));
 			$include_closed = get_option('wpcusn_include_closed_tasks', false) ? 'true' : 'false';
+			$list_search = $this->search_tasks_in_list($list_id, $task_name, $include_closed);
 
-			$this->log_api_debug("List search: looking for '{$task_name}' in list {$list_id} (include_closed={$include_closed})");
+			if (is_wp_error($list_search)) {
+				return $list_search;
+			}
 
-			do {
-				// subtasks=true: keywords are often subtasks; default API response excludes them.
-				// include_timl=true: include tasks whose home list differs but appear on this list.
-				$endpoint = "/list/{$list_id}/task?page={$page}&include_closed={$include_closed}&subtasks=true&include_timl=true";
-				$result = $this->request($endpoint);
-
-				if (is_wp_error($result)) {
-					$this->log_api_debug("List search error on page {$page}: " . $result->get_error_message());
-					if (empty($all_tasks)) {
-						return $result;
-					}
-					break;
-				}
-
-				$page_tasks = isset($result['tasks']) ? $result['tasks'] : array();
-
-				// EARLY EXIT: return as soon as an exact/normalised match is found.
-				foreach ($page_tasks as $task) {
-					if (isset($task['name'])) {
-						$task_lower = strtolower(trim($task['name']));
-						if (
-							$task_lower === $search_lower ||
-							$this->normalize_for_match($task_lower) === $this->normalize_for_match($search_lower)
-						) {
-							$this->log_api_debug("List search: MATCH found on page {$page}! Returning early.");
-							return array('tasks' => array($task));
-						}
-					}
-				}
-
-				$all_tasks = array_merge($all_tasks, $page_tasks);
-
-				$has_more = count($page_tasks) >= 100;
-				$page++;
-
-			} while ($has_more && $page < $max_pages);
-
-			$this->log_api_debug("List search complete: " . count($all_tasks) . " tasks scanned across {$page} page(s)");
-
-			// Filter tasks with fuzzy fallback so tasks with minor punctuation
-			// differences (e.g., trailing "?") are still returned for final
-			// strict matching by the linker.
-			$filtered = $this->filter_tasks_by_name($all_tasks, $task_name, true);
-
-			if (!empty($filtered['tasks'])) {
-				return $filtered;
+			if (!empty($list_search['tasks'])) {
+				return $list_search;
 			}
 
 			// List ID may point at the wrong list or tasks may only appear under space-wide search.
@@ -257,9 +210,14 @@ class WPCUSN_ClickUp_API
 				if (!is_wp_error($team_result) && !empty($team_result['tasks'])) {
 					return $team_result;
 				}
+
+				if (!is_wp_error($team_result) && isset($team_result['_search_meta'])) {
+					$list_search['_search_meta']['fallback_to_team_search'] = true;
+					$list_search['_search_meta']['fallback_team_search'] = $team_result['_search_meta'];
+				}
 			}
 
-			return $filtered;
+			return $list_search;
 		}
 
 		// Use Get Filtered Team Tasks endpoint - searches across ALL folders and lists
@@ -321,7 +279,6 @@ class WPCUSN_ClickUp_API
 	{
 		$all_tasks = array();
 		$page = 0;
-		$max_pages = 50; // Handle 5000+ tasks
 		$search_lower = strtolower(trim($task_name));
 
 		// Configurable: include closed tasks (default OFF for performance)
@@ -352,7 +309,19 @@ class WPCUSN_ClickUp_API
 						$this->normalize_for_match($task_lower) === $this->normalize_for_match($search_lower)
 					) {
 						$this->log_api_debug("Team search: MATCH found on page {$page}! Returning early.");
-						return array('tasks' => array($task));
+						return array(
+							'tasks'        => array($task),
+							'_search_meta' => array(
+								'strategy'       => 'team',
+								'team_id'        => $team_id,
+								'space_id'       => $space_id,
+								'include_closed' => $include_closed,
+								'pages_scanned'  => $page + 1,
+								'tasks_scanned'  => count($all_tasks) + count($page_tasks),
+								'completed_scan' => false,
+								'early_match'    => true,
+							),
+						);
 					}
 				}
 			}
@@ -363,10 +332,10 @@ class WPCUSN_ClickUp_API
 			$has_more = count($page_tasks) >= 100;
 			$page++;
 
-		} while ($has_more && $page < $max_pages);
+		} while ($has_more);
 
 		$total_count = count($all_tasks);
-		$this->log_api_debug("Team search complete: {$total_count} tasks scanned across {$page} page(s), no exact match");
+		$this->log_api_debug("Team search complete: {$total_count} tasks scanned across {$page} page(s), exhausted all available pages");
 
 		// No exact match found - try fuzzy matching
 		$filtered = $this->filter_tasks_by_name($all_tasks, $task_name, true);
@@ -375,6 +344,97 @@ class WPCUSN_ClickUp_API
 		if ($match_count > 0) {
 			$this->log_api_debug("Team search: {$match_count} fuzzy match(es) found");
 		}
+
+		$filtered['_search_meta'] = array(
+			'strategy'       => 'team',
+			'team_id'        => $team_id,
+			'space_id'       => $space_id,
+			'include_closed' => $include_closed,
+			'pages_scanned'  => $page,
+			'tasks_scanned'  => $total_count,
+			'completed_scan' => true,
+			'early_match'    => false,
+		);
+
+		return $filtered;
+	}
+
+	/**
+	 * Search tasks inside a single ClickUp list.
+	 *
+	 * @since 1.4.2
+	 * @param string $list_id List ID.
+	 * @param string $task_name Task name to search for.
+	 * @param string $include_closed Whether closed tasks should be included.
+	 * @return array|WP_Error
+	 */
+	private function search_tasks_in_list($list_id, $task_name, $include_closed)
+	{
+		$all_tasks = array();
+		$page = 0;
+		$search_lower = strtolower(trim($task_name));
+
+		$this->log_api_debug("List search: looking for '{$task_name}' in list {$list_id} (include_closed={$include_closed})");
+
+		do {
+			// subtasks=true: keywords are often subtasks; default API response excludes them.
+			// include_timl=true: include tasks whose home list differs but appear on this list.
+			$endpoint = "/list/{$list_id}/task?page={$page}&include_closed={$include_closed}&subtasks=true&include_timl=true";
+			$result = $this->request($endpoint);
+
+			if (is_wp_error($result)) {
+				$this->log_api_debug("List search error on page {$page}: " . $result->get_error_message());
+				if (empty($all_tasks)) {
+					return $result;
+				}
+				break;
+			}
+
+			$page_tasks = isset($result['tasks']) ? $result['tasks'] : array();
+
+			foreach ($page_tasks as $task) {
+				if (isset($task['name'])) {
+					$task_lower = strtolower(trim($task['name']));
+					if (
+						$task_lower === $search_lower ||
+						$this->normalize_for_match($task_lower) === $this->normalize_for_match($search_lower)
+					) {
+						$this->log_api_debug("List search: MATCH found on page {$page}! Returning early.");
+						return array(
+							'tasks'        => array($task),
+							'_search_meta' => array(
+								'strategy'       => 'list',
+								'list_id'        => $list_id,
+								'include_closed' => $include_closed,
+								'pages_scanned'  => $page + 1,
+								'tasks_scanned'  => count($all_tasks) + count($page_tasks),
+								'completed_scan' => false,
+								'early_match'    => true,
+							),
+						);
+					}
+				}
+			}
+
+			$all_tasks = array_merge($all_tasks, $page_tasks);
+
+			$has_more = count($page_tasks) >= 100;
+			$page++;
+
+		} while ($has_more);
+
+		$this->log_api_debug("List search complete: " . count($all_tasks) . " tasks scanned across {$page} page(s), exhausted all available pages");
+
+		$filtered = $this->filter_tasks_by_name($all_tasks, $task_name, true);
+		$filtered['_search_meta'] = array(
+			'strategy'       => 'list',
+			'list_id'        => $list_id,
+			'include_closed' => $include_closed,
+			'pages_scanned'  => $page,
+			'tasks_scanned'  => count($all_tasks),
+			'completed_scan' => true,
+			'early_match'    => false,
+		);
 
 		return $filtered;
 	}

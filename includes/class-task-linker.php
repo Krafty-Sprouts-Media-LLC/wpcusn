@@ -94,6 +94,69 @@ class WPCUSN_Task_Linker {
 	}
 
 	/**
+	 * Build a readable search diagnostics string for sync logs.
+	 *
+	 * @since 1.4.2
+	 *
+	 * @param array $result Search result payload.
+	 * @return string
+	 */
+	private function format_search_diagnostics( $result ) {
+		if ( empty( $result['_search_meta'] ) || ! is_array( $result['_search_meta'] ) ) {
+			return '';
+		}
+
+		$meta = $result['_search_meta'];
+		$parts = array();
+		$strategy = isset( $meta['strategy'] ) ? $meta['strategy'] : 'unknown';
+
+		if ( 'list' === $strategy && ! empty( $meta['list_id'] ) ) {
+			$parts[] = 'Search path: list ' . $meta['list_id'];
+		} elseif ( 'team' === $strategy ) {
+			$parts[] = 'Search path: team/space';
+			if ( ! empty( $meta['team_id'] ) ) {
+				$parts[] = 'Team: ' . $meta['team_id'];
+			}
+			if ( ! empty( $meta['space_id'] ) ) {
+				$parts[] = 'Space: ' . $meta['space_id'];
+			}
+		}
+
+		if ( isset( $meta['pages_scanned'] ) ) {
+			$parts[] = 'Pages scanned: ' . (int) $meta['pages_scanned'];
+		}
+
+		if ( isset( $meta['tasks_scanned'] ) ) {
+			$parts[] = 'Tasks scanned: ' . (int) $meta['tasks_scanned'];
+		}
+
+		if ( isset( $meta['include_closed'] ) ) {
+			$parts[] = 'Include closed: ' . $meta['include_closed'];
+		}
+
+		if ( ! empty( $meta['completed_scan'] ) ) {
+			$parts[] = 'Scan status: exhausted all available pages';
+		} elseif ( ! empty( $meta['early_match'] ) ) {
+			$parts[] = 'Scan status: exact match found early';
+		}
+
+		if ( ! empty( $meta['fallback_to_team_search'] ) ) {
+			$parts[] = 'Fallback to team/space search: yes';
+		}
+
+		if ( ! empty( $meta['fallback_team_search'] ) && is_array( $meta['fallback_team_search'] ) ) {
+			$fallback_meta = $meta['fallback_team_search'];
+			$parts[] = 'Fallback pages scanned: ' . ( isset( $fallback_meta['pages_scanned'] ) ? (int) $fallback_meta['pages_scanned'] : 0 );
+			$parts[] = 'Fallback tasks scanned: ' . ( isset( $fallback_meta['tasks_scanned'] ) ? (int) $fallback_meta['tasks_scanned'] : 0 );
+			if ( isset( $fallback_meta['completed_scan'] ) && $fallback_meta['completed_scan'] ) {
+				$parts[] = 'Fallback status: exhausted all available pages';
+			}
+		}
+
+		return ! empty( $parts ) ? ' Diagnostics: ' . implode( '. ', $parts ) . '.' : '';
+	}
+
+	/**
 	 * Auto-link post to ClickUp task
 	 *
 	 * @since 1.0.0
@@ -188,7 +251,8 @@ class WPCUSN_Task_Linker {
 				}
 			}
 			$found_list = ! empty( $found_names ) ? " Found tasks: " . implode( ', ', array_slice( $found_names, 0, 5 ) ) . ( count( $found_names ) > 5 ? '...' : '' ) : '';
-			$this->log_auto_link_failure( $post_id, $slug, $task_name, "No matching task found. Searched for: '{$task_name}' (from slug: '{$slug}'). Found {$task_count} tasks but none matched case-insensitively.{$found_list}" );
+			$diagnostics = $this->format_search_diagnostics( $result );
+			$this->log_auto_link_failure( $post_id, $slug, $task_name, "No matching task found. Searched for: '{$task_name}' (from slug: '{$slug}'). Returned {$task_count} candidate task(s).{$found_list}{$diagnostics}" );
 		}
 	}
 
