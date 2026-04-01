@@ -267,7 +267,7 @@ class WPCUSN_ClickUp_API
 	 * Includes performance optimizations:
 	 * - Early exit when match found
 	 * - Configurable include_closed setting
-	 * - Max pages limit
+	 * - Streaming pagination: does not merge every task into memory when no early match
 	 *
 	 * @since 1.2.1
 	 * @param string $team_id Team/Workspace ID
@@ -277,9 +277,12 @@ class WPCUSN_ClickUp_API
 	 */
 	public function search_tasks_in_team($team_id, $space_id, $task_name)
 	{
-		$all_tasks = array();
 		$page = 0;
-		$search_lower = strtolower(trim($task_name));
+		$tasks_scanned = 0;
+		$partial_matches = array();
+		$samples = array();
+		$max_partials = $this->get_max_partial_search_candidates();
+		$partial_cap_hit = false;
 
 		// Configurable: include closed tasks (default OFF for performance)
 		$include_closed = get_option('wpcusn_include_closed_tasks', false) ? 'true' : 'false';
@@ -292,7 +295,7 @@ class WPCUSN_ClickUp_API
 
 			if (is_wp_error($result)) {
 				$this->log_api_debug("Team search error on page {$page}: " . $result->get_error_message());
-				if (empty($all_tasks)) {
+				if (0 === $tasks_scanned && empty($partial_matches)) {
 					return $result;
 				}
 				break;
@@ -300,33 +303,39 @@ class WPCUSN_ClickUp_API
 
 			$page_tasks = isset($result['tasks']) ? $result['tasks'] : array();
 
-			// EARLY EXIT: Check for exact match on each page to avoid fetching all pages
 			foreach ($page_tasks as $task) {
-				if (isset($task['name'])) {
-					$task_lower = strtolower(trim($task['name']));
-					if (
-						$task_lower === $search_lower ||
-						$this->normalize_for_match($task_lower) === $this->normalize_for_match($search_lower)
-					) {
-						$this->log_api_debug("Team search: MATCH found on page {$page}! Returning early.");
-						return array(
-							'tasks'        => array($task),
-							'_search_meta' => array(
-								'strategy'       => 'team',
-								'team_id'        => $team_id,
-								'space_id'       => $space_id,
-								'include_closed' => $include_closed,
-								'pages_scanned'  => $page + 1,
-								'tasks_scanned'  => count($all_tasks) + count($page_tasks),
-								'completed_scan' => false,
-								'early_match'    => true,
-							),
-						);
-					}
+				if (isset($task['name']) && count($samples) < 5) {
+					$samples[] = $task['name'];
 				}
 			}
 
-			$all_tasks = array_merge($all_tasks, $page_tasks);
+			$page_analysis = $this->analyze_page_tasks_for_search($page_tasks, $task_name);
+			$tasks_scanned += $page_analysis['tasks_consumed_on_page'];
+
+			if (null !== $page_analysis['early_task']) {
+				$this->log_api_debug("Team search: MATCH found on page {$page}! Returning early.");
+				return array(
+					'tasks'        => array($page_analysis['early_task']),
+					'_search_meta' => array(
+						'strategy'       => 'team',
+						'team_id'        => $team_id,
+						'space_id'       => $space_id,
+						'include_closed' => $include_closed,
+						'pages_scanned'  => $page + 1,
+						'tasks_scanned'  => $tasks_scanned,
+						'completed_scan' => false,
+						'early_match'    => true,
+					),
+				);
+			}
+
+			foreach ($page_analysis['partials'] as $partial_task) {
+				if (count($partial_matches) >= $max_partials) {
+					$partial_cap_hit = true;
+					break 2;
+				}
+				$partial_matches[] = $partial_task;
+			}
 
 			// Check if there are more pages
 			$has_more = count($page_tasks) >= 100;
@@ -334,29 +343,40 @@ class WPCUSN_ClickUp_API
 
 		} while ($has_more);
 
-		$total_count = count($all_tasks);
-		$this->log_api_debug("Team search complete: {$total_count} tasks scanned across {$page} page(s), exhausted all available pages");
+		$this->log_api_debug("Team search complete: {$tasks_scanned} tasks scanned across {$page} page(s), exhausted all available pages");
 
-		// No exact match found - try fuzzy matching
-		$filtered = $this->filter_tasks_by_name($all_tasks, $task_name, true);
-		$match_count = isset($filtered['tasks']) ? count($filtered['tasks']) : 0;
-
-		if ($match_count > 0) {
-			$this->log_api_debug("Team search: {$match_count} fuzzy match(es) found");
+		$this->log_api_debug('Sample task names from API: ' . implode(' | ', $samples));
+		if (!empty($partial_matches)) {
+			$partial_names = array();
+			foreach (array_slice($partial_matches, 0, 5) as $pt) {
+				if (isset($pt['name'])) {
+					$partial_names[] = $pt['name'];
+				}
+			}
+			$this->log_api_debug('Partial matches found: ' . implode(' | ', $partial_names));
+			$this->log_api_debug('Using fuzzy match fallback: returning ' . count($partial_matches) . ' partial match(es)');
+		}
+		if ($partial_cap_hit) {
+			$this->log_api_debug('Partial match cap reached (' . $max_partials . '); remaining pages not scanned for fuzzy candidates.');
 		}
 
-		$filtered['_search_meta'] = array(
-			'strategy'       => 'team',
-			'team_id'        => $team_id,
-			'space_id'       => $space_id,
-			'include_closed' => $include_closed,
-			'pages_scanned'  => $page,
-			'tasks_scanned'  => $total_count,
-			'completed_scan' => true,
-			'early_match'    => false,
+		$out = array(
+			'tasks'        => $partial_matches,
+			'_search_meta' => array(
+				'strategy'          => 'team',
+				'team_id'           => $team_id,
+				'space_id'          => $space_id,
+				'include_closed'    => $include_closed,
+				'pages_scanned'     => $page,
+				'tasks_scanned'     => $tasks_scanned,
+				'completed_scan'    => ! $partial_cap_hit,
+				'early_match'       => false,
+				'partial_cap_hit'   => $partial_cap_hit,
+				'partial_cap_limit' => $max_partials,
+			),
 		);
 
-		return $filtered;
+		return $out;
 	}
 
 	/**
@@ -370,9 +390,12 @@ class WPCUSN_ClickUp_API
 	 */
 	private function search_tasks_in_list($list_id, $task_name, $include_closed)
 	{
-		$all_tasks = array();
 		$page = 0;
-		$search_lower = strtolower(trim($task_name));
+		$tasks_scanned = 0;
+		$partial_matches = array();
+		$samples = array();
+		$max_partials = $this->get_max_partial_search_candidates();
+		$partial_cap_hit = false;
 
 		$this->log_api_debug("List search: looking for '{$task_name}' in list {$list_id} (include_closed={$include_closed})");
 
@@ -384,7 +407,7 @@ class WPCUSN_ClickUp_API
 
 			if (is_wp_error($result)) {
 				$this->log_api_debug("List search error on page {$page}: " . $result->get_error_message());
-				if (empty($all_tasks)) {
+				if (0 === $tasks_scanned && empty($partial_matches)) {
 					return $result;
 				}
 				break;
@@ -393,50 +416,132 @@ class WPCUSN_ClickUp_API
 			$page_tasks = isset($result['tasks']) ? $result['tasks'] : array();
 
 			foreach ($page_tasks as $task) {
-				if (isset($task['name'])) {
-					$task_lower = strtolower(trim($task['name']));
-					if (
-						$task_lower === $search_lower ||
-						$this->normalize_for_match($task_lower) === $this->normalize_for_match($search_lower)
-					) {
-						$this->log_api_debug("List search: MATCH found on page {$page}! Returning early.");
-						return array(
-							'tasks'        => array($task),
-							'_search_meta' => array(
-								'strategy'       => 'list',
-								'list_id'        => $list_id,
-								'include_closed' => $include_closed,
-								'pages_scanned'  => $page + 1,
-								'tasks_scanned'  => count($all_tasks) + count($page_tasks),
-								'completed_scan' => false,
-								'early_match'    => true,
-							),
-						);
-					}
+				if (isset($task['name']) && count($samples) < 5) {
+					$samples[] = $task['name'];
 				}
 			}
 
-			$all_tasks = array_merge($all_tasks, $page_tasks);
+			$page_analysis = $this->analyze_page_tasks_for_search($page_tasks, $task_name);
+			$tasks_scanned += $page_analysis['tasks_consumed_on_page'];
+
+			if (null !== $page_analysis['early_task']) {
+				$this->log_api_debug("List search: MATCH found on page {$page}! Returning early.");
+				return array(
+					'tasks'        => array($page_analysis['early_task']),
+					'_search_meta' => array(
+						'strategy'       => 'list',
+						'list_id'        => $list_id,
+						'include_closed' => $include_closed,
+						'pages_scanned'  => $page + 1,
+						'tasks_scanned'  => $tasks_scanned,
+						'completed_scan' => false,
+						'early_match'    => true,
+					),
+				);
+			}
+
+			foreach ($page_analysis['partials'] as $partial_task) {
+				if (count($partial_matches) >= $max_partials) {
+					$partial_cap_hit = true;
+					break 2;
+				}
+				$partial_matches[] = $partial_task;
+			}
 
 			$has_more = count($page_tasks) >= 100;
 			$page++;
 
 		} while ($has_more);
 
-		$this->log_api_debug("List search complete: " . count($all_tasks) . " tasks scanned across {$page} page(s), exhausted all available pages");
+		$this->log_api_debug("List search complete: {$tasks_scanned} tasks scanned across {$page} page(s), exhausted all available pages");
 
-		$filtered = $this->filter_tasks_by_name($all_tasks, $task_name, true);
-		$filtered['_search_meta'] = array(
-			'strategy'       => 'list',
-			'list_id'        => $list_id,
-			'include_closed' => $include_closed,
-			'pages_scanned'  => $page,
-			'tasks_scanned'  => count($all_tasks),
-			'completed_scan' => true,
-			'early_match'    => false,
+		$this->log_api_debug('Sample task names from API: ' . implode(' | ', $samples));
+		if (!empty($partial_matches)) {
+			$partial_names = array();
+			foreach (array_slice($partial_matches, 0, 5) as $pt) {
+				if (isset($pt['name'])) {
+					$partial_names[] = $pt['name'];
+				}
+			}
+			$this->log_api_debug('Partial matches found: ' . implode(' | ', $partial_names));
+			$this->log_api_debug('Using fuzzy match fallback: returning ' . count($partial_matches) . ' partial match(es)');
+		}
+		if ($partial_cap_hit) {
+			$this->log_api_debug('Partial match cap reached (' . $max_partials . '); remaining pages not scanned for fuzzy candidates.');
+		}
+
+		return array(
+			'tasks'        => $partial_matches,
+			'_search_meta' => array(
+				'strategy'          => 'list',
+				'list_id'           => $list_id,
+				'include_closed'    => $include_closed,
+				'pages_scanned'     => $page,
+				'tasks_scanned'     => $tasks_scanned,
+				'completed_scan'    => ! $partial_cap_hit,
+				'early_match'       => false,
+				'partial_cap_hit'   => $partial_cap_hit,
+				'partial_cap_limit' => $max_partials,
+			),
 		);
+	}
 
-		return $filtered;
+	/**
+	 * Maximum fuzzy substring candidates to keep across pages (bounds PHP memory).
+	 *
+	 * @since 1.4.3
+	 * @return int
+	 */
+	private function get_max_partial_search_candidates()
+	{
+		return 200;
+	}
+
+	/**
+	 * Classify tasks on one API page: early exact/normalised hit, or partial substring matches.
+	 * Used to avoid merging entire large lists into PHP memory.
+	 *
+	 * @since 1.4.3
+	 * @param array  $page_tasks Tasks from one ClickUp page.
+	 * @param string $task_name  Name derived from post slug.
+	 * @return array {
+	 *     @type array|null $early_task              First exact/normalised match, or null.
+	 *     @type int        $tasks_consumed_on_page  Tasks counted on this page for diagnostics (includes early hit).
+	 *     @type array      $partials                Substring matches for fuzzy fallback.
+	 * }
+	 */
+	private function analyze_page_tasks_for_search($page_tasks, $task_name)
+	{
+		$search_lower = strtolower(trim($task_name));
+		$partials = array();
+		$consumed = 0;
+
+		foreach ($page_tasks as $task) {
+			$consumed++;
+			if (!isset($task['name'])) {
+				continue;
+			}
+			$task_lower = strtolower(trim($task['name']));
+			if (
+				$task_lower === $search_lower ||
+				$this->normalize_for_match($task_lower) === $this->normalize_for_match($search_lower)
+			) {
+				return array(
+					'early_task'             => $task,
+					'tasks_consumed_on_page' => $consumed,
+					'partials'               => array(),
+				);
+			}
+			if (strpos($task_lower, $search_lower) !== false || strpos($search_lower, $task_lower) !== false) {
+				$partials[] = $task;
+			}
+		}
+
+		return array(
+			'early_task'             => null,
+			'tasks_consumed_on_page' => count($page_tasks),
+			'partials'               => $partials,
+		);
 	}
 
 	/**

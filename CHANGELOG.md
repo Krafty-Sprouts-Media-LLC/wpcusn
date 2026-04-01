@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 01/04/2026
+
+### Changed
+- **WordPress Memory For Large Keyword Lists:** List and team task search no longer merges every task from every page into one giant PHP array. Each page is processed in isolation; only exact/normalised hits (early exit) and a bounded set of fuzzy substring candidates (default 200) are retained, so long scans without a match no longer scale memory with full workspace size.
+
 ## [1.4.2] - 31/03/2026
 
 ### Fixed

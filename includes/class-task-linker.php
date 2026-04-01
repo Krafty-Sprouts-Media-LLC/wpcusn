@@ -5,8 +5,6 @@
  * @package WPCUSN
  * @author Krafty Sprouts Media, LLC
  * @since 1.0.0
- * @version 1.0.0
- * @last_modified 2024-01-01
  *
  * Handles automatic linking of WordPress posts to ClickUp tasks by slug.
  */
@@ -151,6 +149,15 @@ class WPCUSN_Task_Linker {
 			if ( isset( $fallback_meta['completed_scan'] ) && $fallback_meta['completed_scan'] ) {
 				$parts[] = 'Fallback status: exhausted all available pages';
 			}
+			if ( ! empty( $fallback_meta['partial_cap_hit'] ) ) {
+				$limit = isset( $fallback_meta['partial_cap_limit'] ) ? (int) $fallback_meta['partial_cap_limit'] : 0;
+				$parts[] = 'Fallback fuzzy candidate cap reached (' . $limit . ')';
+			}
+		}
+
+		if ( ! empty( $meta['partial_cap_hit'] ) ) {
+			$limit = isset( $meta['partial_cap_limit'] ) ? (int) $meta['partial_cap_limit'] : 0;
+			$parts[] = 'Fuzzy candidate cap reached (' . $limit . '); scan stopped early for memory';
 		}
 
 		return ! empty( $parts ) ? ' Diagnostics: ' . implode( '. ', $parts ) . '.' : '';
