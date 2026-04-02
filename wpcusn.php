@@ -3,7 +3,7 @@
  * Plugin Name: WPCUSN - WordPress ClickUp Sync-nator
  * Plugin URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
  * Description: Two-way status synchronization between WordPress and ClickUp
- * Version: 1.4.3
+ * Version: 1.5.2
  * Author: Krafty Sprouts Media, LLC
  * Author URI: https://animalofthings.com
  * GitHub URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WPCUSN_VERSION', '1.4.3');
+define('WPCUSN_VERSION', '1.5.2');
 define('WPCUSN_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WPCUSN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WPCUSN_PLUGIN_FILE', __FILE__);
@@ -116,6 +116,7 @@ class WPCUSN
 	 */
 	private function load_dependencies()
 	{
+		require_once WPCUSN_PLUGIN_DIR . 'includes/class-sync-logger.php';
 		require_once WPCUSN_PLUGIN_DIR . 'includes/class-clickup-api.php';
 		require_once WPCUSN_PLUGIN_DIR . 'includes/class-clickup-oauth.php';
 		require_once WPCUSN_PLUGIN_DIR . 'includes/class-status-mapper.php';
@@ -152,12 +153,26 @@ class WPCUSN
 
 		// Initialize webhook handler
 		WPCUSN_Webhook_Handler::get_instance();
+
+		// PHASE 2 (02/04/2026): Async status sync handler.
+		// Registered here so it is available during cron execution.
+		add_action( 'wpcusn_do_sync_to_clickup', array( WPCUSN_Status_Mapper::get_instance(), 'run_async_sync' ), 10, 4 );
 	}
 }
 
 // Initialize plugin
 WPCUSN::get_instance();
 
-// Register deactivation hook to clear cron
-register_deactivation_hook(__FILE__, array('WPCUSN_Task_Linker', 'clear_cron'));
+// Register activation hook — creates the sync log DB table.
+register_activation_hook( __FILE__, array( 'WPCUSN_Sync_Logger', 'create_table' ) );
 
+// Register deactivation hook to clear cron
+register_deactivation_hook( __FILE__, array( 'WPCUSN_Task_Linker', 'clear_cron' ) );
+
+// Upgrade hook: ensure the DB table exists for sites that update without
+// deactivating/reactivating. Runs once per version bump.
+add_action( 'plugins_loaded', function () {
+	if ( get_option( 'wpcusn_db_version' ) !== '1.5.0' ) {
+		WPCUSN_Sync_Logger::create_table();
+	}
+} );

@@ -20,7 +20,7 @@ $pluginFile = "wpcusn.php"
 if (Test-Path $pluginFile) {
     $content = Get-Content $pluginFile -Raw
     $content = $content -replace "Version: \d+\.\d+\.\d+", "Version: $Version"
-    $content = $content -replace "define\( 'WPCUSN_VERSION', '[^']+' \);", "define( 'WPCUSN_VERSION', '$Version' );"
+    $content = $content -replace "define\(\s*'WPCUSN_VERSION',\s*'[^']+'\s*\)\s*;", "define('WPCUSN_VERSION', '$Version');"
     Set-Content $pluginFile $content
     Write-Host "✓ Updated version in $pluginFile" -ForegroundColor Green
 } else {

@@ -5,8 +5,8 @@
  * @package WPCUSN
  * @author Krafty Sprouts Media, LLC
  * @since 1.0.0
- * @version 1.0.0
- * @last_modified 2024-01-01
+ * @version 1.1.0
+ * @last_modified 02/04/2026
  *
  * Adds meta box to post editor for ClickUp sync controls.
  */
@@ -77,54 +77,21 @@ class WPCUSN_Post_Meta_Box
 	/**
 	 * Auto-link on post edit page load if not linked
 	 *
+	 * PERFORMANCE FIX (02/04/2026): Removed automatic AJAX trigger.
+	 * The previous implementation silently fired a ClickUp API request
+	 * (with a 30s timeout) on every post-edit page load for unlinked posts,
+	 * causing progressive admin slowdown. The "Try Auto-Link Now" button
+	 * still exists for manual use — it just no longer fires automatically.
+	 *
 	 * @since 1.2.0
+	 * @modified 1.1.0 Removed auto-trigger for performance
 	 */
 	public function auto_link_on_load()
 	{
-		global $post;
-		if (!$post || 'post' !== $post->post_type) {
-			return;
-		}
-
-		// Only on post edit screen
-		$screen = get_current_screen();
-		if (!$screen || 'post' !== $screen->id) {
-			return;
-		}
-
-		// Skip if already linked
-		$task_id = get_post_meta($post->ID, '_clickup_task_id', true);
-		if ($task_id) {
-			return;
-		}
-
-		// Skip if no slug
-		if (!$post->post_name) {
-			return;
-		}
-
-		// Skip if Space ID not configured
-		$space_id = get_option('wpcusn_space_id');
-		$list_id = get_option('wpcusn_list_id');
-		if (!$space_id && !$list_id) {
-			return;
-		}
-
-		// Auto-trigger linking via AJAX
-		?>
-		<script>
-			jQuery(document).ready(function ($) {
-				// Auto-trigger linking when page loads (after 500ms delay to ensure page is ready)
-				// Only run once - check if already running
-				if ($('#wpcusn-try-auto-link').length && !window.wpcusnAutoLinkTriggered) {
-					window.wpcusnAutoLinkTriggered = true;
-					setTimeout(function () {
-						$('#wpcusn-try-auto-link').trigger('click');
-					}, 500);
-				}
-			});
-		</script>
-		<?php
+		// PERFORMANCE FIX: Auto-trigger removed. The "Try Auto-Link Now"
+		// button in the meta box is still available for manual use.
+		// Automatic linking now happens via the twice-daily cron job only.
+		return;
 	}
 
 	/**

@@ -4,7 +4,7 @@ Tags: clickup, sync, wordpress, tasks, status
 Requires at least: 6.8
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 1.4.0
+Stable tag: 1.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -93,6 +93,20 @@ The post will not be linked, but you can manually link it later or rename the Cl
 Currently, the plugin only works with the default "post" post type. Support for custom post types may be added in future versions.
 
 == Changelog ==
+
+= 1.5.2 =
+* Fixed: ClickUp API debug logging now uses the same database log as all other sync events (no more legacy wp_options writes); entries show in the settings log panel.
+* Fixed: Log viewer row formatting initializes message text per entry correctly.
+
+= 1.5.1 =
+* Fixed: Settings sync log panel reads from the database table introduced in 1.5.0 (was still reading the old option).
+
+= 1.5.0 =
+* Added: Dedicated sync log database table; replaces large serialized log in wp_options.
+* Changed: WordPress to ClickUp status sync runs via WP-Cron after save so the editor does not block on ClickUp API calls.
+
+= 1.4.4 =
+* Fixed: Removed auto AJAX ClickUp calls on every post edit load; reduced API timeout; cached list status validation; sync log option no longer autoloads.
 
 = 1.4.0 =
 * Fixed: Auto-link now paginates through all pages when searching a specific List ID (previously only fetched first 100 tasks, causing misses on large lists)

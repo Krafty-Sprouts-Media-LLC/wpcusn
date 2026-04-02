@@ -7,6 +7,10 @@
  * @since 1.0.0
  *
  * Handles automatic linking of WordPress posts to ClickUp tasks by slug.
+ *
+ * PHASE 2 CHANGE (02/04/2026):
+ * All private log_auto_link_*() methods now route through WPCUSN_Sync_Logger::insert()
+ * (dedicated DB table) instead of the wpcusn_sync_logs wp_options key.
  */
 
 // Exit if accessed directly
@@ -314,20 +318,13 @@ class WPCUSN_Task_Linker {
 	 * @param string $list_id List ID
 	 */
 	private function log_auto_link_attempt( $post_id, $slug, $task_name, $space_id, $list_id ) {
-		$logs = get_option( 'wpcusn_sync_logs', array() );
-		$logs[] = array(
-			'post_id'    => $post_id,
-			'task_id'    => '',
-			'direction'  => 'auto_link_attempt',
-			'old_status' => "Slug: {$slug}",
-			'new_status' => "Searching: '{$task_name}' (Space: {$space_id}, List: " . ( $list_id ?: 'none' ) . ")",
-			'success'    => null,
-			'timestamp'  => current_time( 'mysql' ),
+		// PHASE 2 (02/04/2026): Log via dedicated DB table.
+		WPCUSN_Sync_Logger::insert(
+			$post_id, '', 'auto_link_attempt',
+			"Slug: {$slug}",
+			"Searching: '{$task_name}' (Space: {$space_id}, List: " . ( $list_id ?: 'none' ) . ')',
+			null
 		);
-		if ( count( $logs ) > 50 ) {
-			$logs = array_slice( $logs, -50 );
-		}
-		update_option( 'wpcusn_sync_logs', $logs );
 	}
 
 	/**
@@ -340,20 +337,13 @@ class WPCUSN_Task_Linker {
 	 * @param string $task_name Task name
 	 */
 	private function log_auto_link_success( $post_id, $slug, $task_id, $task_name ) {
-		$logs = get_option( 'wpcusn_sync_logs', array() );
-		$logs[] = array(
-			'post_id'    => $post_id,
-			'task_id'    => $task_id,
-			'direction'  => 'auto_link_success',
-			'old_status' => "Slug: {$slug}",
-			'new_status' => "Linked to: '{$task_name}' ({$task_id})",
-			'success'    => true,
-			'timestamp'  => current_time( 'mysql' ),
+		// PHASE 2 (02/04/2026): Log via dedicated DB table.
+		WPCUSN_Sync_Logger::insert(
+			$post_id, $task_id, 'auto_link_success',
+			"Slug: {$slug}",
+			"Linked to: '{$task_name}' ({$task_id})",
+			true
 		);
-		if ( count( $logs ) > 50 ) {
-			$logs = array_slice( $logs, -50 );
-		}
-		update_option( 'wpcusn_sync_logs', $logs );
 	}
 
 	/**
@@ -366,20 +356,13 @@ class WPCUSN_Task_Linker {
 	 * @param string $reason Failure reason
 	 */
 	private function log_auto_link_failure( $post_id, $slug, $task_name, $reason ) {
-		$logs = get_option( 'wpcusn_sync_logs', array() );
-		$logs[] = array(
-			'post_id'    => $post_id,
-			'task_id'    => '',
-			'direction'  => 'auto_link_failed',
-			'old_status' => "Slug: {$slug}, Searched: '{$task_name}'",
-			'new_status' => "Failed: {$reason}",
-			'success'    => false,
-			'timestamp'  => current_time( 'mysql' ),
+		// PHASE 2 (02/04/2026): Log via dedicated DB table.
+		WPCUSN_Sync_Logger::insert(
+			$post_id, '', 'auto_link_failed',
+			"Slug: {$slug}, Searched: '{$task_name}'",
+			"Failed: {$reason}",
+			false
 		);
-		if ( count( $logs ) > 50 ) {
-			$logs = array_slice( $logs, -50 );
-		}
-		update_option( 'wpcusn_sync_logs', $logs );
 	}
 
 	/**
@@ -390,20 +373,13 @@ class WPCUSN_Task_Linker {
 	 * @param string $task_id Task ID that was unlinked
 	 */
 	private function log_auto_link_unlink( $post_id, $task_id ) {
-		$logs = get_option( 'wpcusn_sync_logs', array() );
-		$logs[] = array(
-			'post_id'    => $post_id,
-			'task_id'    => $task_id,
-			'direction'  => 'task_unlinked',
-			'old_status' => "Task ID: {$task_id}",
-			'new_status' => 'Unlinked',
-			'success'    => true,
-			'timestamp'  => current_time( 'mysql' ),
+		// PHASE 2 (02/04/2026): Log via dedicated DB table.
+		WPCUSN_Sync_Logger::insert(
+			$post_id, $task_id, 'task_unlinked',
+			"Task ID: {$task_id}",
+			'Unlinked',
+			true
 		);
-		if ( count( $logs ) > 50 ) {
-			$logs = array_slice( $logs, -50 );
-		}
-		update_option( 'wpcusn_sync_logs', $logs );
 	}
 
 	/**
@@ -442,18 +418,12 @@ class WPCUSN_Task_Linker {
 		$linked_count = 0;
 		$processed_count = 0;
 
-		// Log cron start
-		$logs = get_option( 'wpcusn_sync_logs', array() );
-		$logs[] = array(
-			'post_id'    => 0,
-			'task_id'    => '',
-			'direction'  => 'cron_auto_link_start',
-			'old_status' => 'Cron job started',
-			'new_status' => sprintf( 'Found %d unlinked posts to process', count( $unlinked_posts ) ),
-			'success'    => null,
-			'timestamp'  => current_time( 'mysql' ),
+		// PHASE 2 (02/04/2026): Log cron start via DB table.
+		WPCUSN_Sync_Logger::insert(
+			0, '', 'cron_auto_link_start', 'Cron job started',
+			sprintf( 'Found %d unlinked posts to process', count( $unlinked_posts ) ),
+			null
 		);
-
 		foreach ( $unlinked_posts as $post_id ) {
 			$post = get_post( $post_id );
 			if ( ! $post || ! $post->post_name ) {
@@ -478,23 +448,13 @@ class WPCUSN_Task_Linker {
 			}
 		}
 
-		// Log cron completion
-		$logs[] = array(
-			'post_id'    => 0,
-			'task_id'    => '',
-			'direction'  => 'cron_auto_link_complete',
-			'old_status' => sprintf( 'Processed %d posts', $processed_count ),
-			'new_status' => sprintf( 'Successfully linked %d posts', $linked_count ),
-			'success'    => true,
-			'timestamp'  => current_time( 'mysql' ),
+		// PHASE 2 (02/04/2026): Log cron completion via DB table.
+		WPCUSN_Sync_Logger::insert(
+			0, '', 'cron_auto_link_complete',
+			sprintf( 'Processed %d posts', $processed_count ),
+			sprintf( 'Successfully linked %d posts', $linked_count ),
+			true
 		);
-
-		// Apply log limit
-		$log_limit = get_option( 'wpcusn_max_log_entries', 200 );
-		if ( count( $logs ) > $log_limit ) {
-			$logs = array_slice( $logs, -$log_limit );
-		}
-		update_option( 'wpcusn_sync_logs', $logs );
 	}
 
 	/**

@@ -103,9 +103,12 @@ class WPCUSN_ClickUp_API
 		$headers = $this->get_auth_headers();
 
 		$args = array(
-			'method' => $method,
+			'method'  => $method,
 			'headers' => $headers,
-			'timeout' => 30,
+			// PERFORMANCE FIX (02/04/2026): Reduced from 30s to 10s.
+			// 30s was blocking the admin thread for up to 90s per status change
+			// (3 sequential API calls). Failing fast is better than hanging.
+			'timeout' => 10,
 		);
 
 		if ($body && in_array($method, array('POST', 'PUT', 'PATCH'), true)) {
@@ -552,37 +555,15 @@ class WPCUSN_ClickUp_API
 	 */
 	private function log_api_debug($message)
 	{
-		$logs = get_option('wpcusn_sync_logs', array());
-		$logs[] = array(
-			'post_id' => 0,
-			'task_id' => '',
-			'direction' => 'api_debug',
-			'old_status' => '',
-			'new_status' => $message,
-			'success' => null,
-			'timestamp' => current_time('mysql'),
+		WPCUSN_Sync_Logger::insert(
+			0,
+			'',
+			'api_debug',
+			'',
+			(string) $message,
+			true,
+			''
 		);
-
-		// Get configurable limits
-		$log_limit = (int) get_option('wpcusn_log_limit', 200);
-		$retention_days = (int) get_option('wpcusn_log_retention_days', 7);
-
-		// Time-based cleanup: remove logs older than retention period
-		if ($retention_days > 0) {
-			$cutoff = strtotime("-{$retention_days} days");
-			$logs = array_filter($logs, function ($log) use ($cutoff) {
-				$timestamp = isset($log['timestamp']) ? strtotime($log['timestamp']) : 0;
-				return $timestamp > $cutoff;
-			});
-			$logs = array_values($logs); // Re-index
-		}
-
-		// Enforce max log limit
-		if (count($logs) > $log_limit) {
-			$logs = array_slice($logs, -$log_limit);
-		}
-
-		update_option('wpcusn_sync_logs', $logs);
 	}
 
 	/**

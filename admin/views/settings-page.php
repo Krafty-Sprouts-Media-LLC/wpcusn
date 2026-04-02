@@ -21,8 +21,9 @@ $team_id = get_option('wpcusn_team_id');
 $list_id = get_option('wpcusn_list_id');
 $webhook_id = get_option('wpcusn_webhook_id');
 $webhook_url = rest_url('clickup/v1/webhook');
-$logs = get_option('wpcusn_sync_logs', array());
-$logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
+// PHASE 2 (02/04/2026): Read logs from dedicated DB table via WPCUSN_Sync_Logger.
+$logs = WPCUSN_Sync_Logger::get_logs( 50 ); // Last 50 entries, newest first
+$log_count = WPCUSN_Sync_Logger::count();
 ?>
 
 <!-- SweetAlert2 -->
@@ -527,7 +528,7 @@ $logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
 			<div class="wpcusn-term-dot r"></div>
 			<div class="wpcusn-term-dot y"></div>
 			<div class="wpcusn-term-dot g"></div>
-			<span class="wpcusn-term-title">wpcusn-sync.log — <?php echo count($logs); ?> entries</span>
+			<span class="wpcusn-term-title">wpcusn-sync.log — <?php echo (int) $log_count; ?> entries</span>
 		</div>
 		<div class="wpcusn-terminal-body">
 			<?php if (empty($logs)): ?>
@@ -538,11 +539,13 @@ $logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
 			<?php else: ?>
 				<?php foreach ($logs as $log): ?>
 					<?php
-					$timestamp = $log['timestamp'] ?? $log['time'] ?? '';
-					$direction = $log['direction'] ?? '';
-					$new_status = $log['new_status'] ?? '';
-					$error = $log['error'] ?? '';
-					$success = $log['success'] ?? null;
+					// DB rows are stdClass objects. Map to the same local vars the template uses.
+					$message = '';
+					$timestamp = $log->created_at ?? '';
+					$direction = $log->direction ?? '';
+					$new_status = $log->new_status ?? '';
+					$error = $log->message ?? '';   // 'message' column holds error details
+					$success = isset( $log->success ) ? (int) $log->success : null; // 1=success, 0=fail, NULL=info
 
 					// Determine Badge
 					$badge_class = 'info';
@@ -556,27 +559,26 @@ $logs = array_slice(array_reverse($logs), 0, 50); // Last 50 entries
 						$badge_label = 'SYNC IN';
 					}
 
-					if ($error || $success === false) {
+					if ($error || $success === 0) {
 						$badge_class = 'err';
 						$badge_label = 'ERROR';
-					} elseif ($success === true) {
+					} elseif ($success === 1) {
 						// $badge_class = 'in'; // Keep direction color but maybe add checkmark?
 					}
 
 					// Format message
-					$message = '';
-					if ($log['post_id'] ?? false)
-						$message .= "Post #" . $log['post_id'] . " ";
-					if ($log['task_id'] ?? false)
-						$message .= "Task " . $log['task_id'] . " ";
+					if ($log->post_id ?? false)
+						$message .= "Post #" . $log->post_id . " ";
+					if ($log->task_id ?? false)
+						$message .= "Task " . $log->task_id . " ";
 					if ($new_status)
 						$message .= "→ " . $new_status;
 					if ($error)
 						$message .= " [" . $error . "]";
-					if (isset($log['old_status']))
-						$message = "Status: " . $log['old_status'] . " " . $message;
+					if (isset($log->old_status))
+						$message = "Status: " . $log->old_status . " " . $message;
 					if ($direction === 'auto_link_success')
-						$message = "Linked Post #" . ($log['post_id'] ?? '') . " to " . ($log['task_id'] ?? '');
+						$message = "Linked Post #" . ($log->post_id ?? '') . " to " . ($log->task_id ?? '');
 
 					?>
 					<div class="wpcusn-log-line">

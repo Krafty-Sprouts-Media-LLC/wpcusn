@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 02/04/2026
+
+### Fixed
+- **`class-clickup-api.php` — `log_api_debug()`:** Last remaining writer to the legacy `wpcusn_sync_logs` option now uses `WPCUSN_Sync_Logger::insert()` so API debug lines appear in the settings terminal log and no longer touch `wp_options`.
+- **`admin/views/settings-page.php`:** Sync log loop now initializes `$message` each row so debug and status lines render without undefined-variable noise.
+
+### Changed
+- **`readme.txt`:** `Stable tag` set to 1.5.2; changelog section updated with summaries for 1.4.4 through 1.5.2.
+- **`release.ps1`:** Version replace for `WPCUSN_VERSION` now matches `define()` with or without spaces inside the parentheses (matches current `wpcusn.php` style).
+
+## [1.5.1] - 02/04/2026
+
+### Fixed
+- **Log Viewer Broken After Phase 2 Migration (`admin/views/settings-page.php`):** The terminal-style sync log panel was still reading from `get_option('wpcusn_sync_logs')`, which is no longer written to as of v1.5.0. The panel always showed "-- No logs available --". Updated to read from `WPCUSN_Sync_Logger::get_logs(50)` (DB table). Entry count in the terminal header now reflects the true total row count via `WPCUSN_Sync_Logger::count()`. Row field access updated from array keys (`$log['field']`) to object properties (`$log->field`) to match the `stdClass` objects returned by `$wpdb->get_results()`. Badge logic updated: `$success === 0` (DB int) replaces `$success === false` for error detection, `$success === 1` replaces `=== true` for success.
+
+## [1.5.0] - 02/04/2026
+
+### Added
+- **New file `includes/class-sync-logger.php`:** Introduces `WPCUSN_Sync_Logger`, a dedicated database table (`{prefix}wpcusn_sync_logs`) for storing sync event logs. The table is created automatically on plugin activation (or upgrade without reactivation) via `dbDelta()`. It includes an indexed `post_id` and `created_at` column, and a probabilistic prune routine that keeps rows below the `wpcusn_log_limit` option (default 500). This completely replaces the `wp_options` / `wpcusn_sync_logs` pattern.
+
+### Changed
+- **PHASE 2 — Async Status Sync via WP-Cron (`class-status-mapper.php`):** `sync_to_clickup()` no longer executes ClickUp API calls inline on the `transition_post_status` hook. It now performs only fast validation (status mapping check + task-ID check) and then schedules a `wp_schedule_single_event()` job (`wpcusn_do_sync_to_clickup`). All heavy API work (resolving the list ID, validating the status in ClickUp, calling `update_task_status()`) is deferred to the new `run_async_sync()` method, which runs on the WP-Cron tick after the page has already responded to the browser. `spawn_cron()` is called immediately after scheduling to minimize latency. The result: post status saves in the editor no longer block on any ClickUp network I/O.
+- **PHASE 2 — All logging routes through `WPCUSN_Sync_Logger::insert()` (`class-status-mapper.php`, `class-webhook-handler.php`, `class-task-linker.php`):** All 8 former `get_option / array_push / update_option` log cycles have been replaced with single `WPCUSN_Sync_Logger::insert()` DB-insert calls. This eliminates the read-modify-write cycle on a growing serialized PHP array that was the root cause of `wp_options` bloat and the need for the Phase 1 autoload fix.
+- **`wpcusn.php`:** Registers `register_activation_hook` → `WPCUSN_Sync_Logger::create_table()`, a `plugins_loaded` upgrade check on `wpcusn_db_version`, and the `wpcusn_do_sync_to_clickup` action hook bound to `WPCUSN_Status_Mapper::run_async_sync()`.
+
+### Migration Notes
+- The `wpcusn_sync_logs` option in `wp_options` is no longer written to. Existing data in that option is harmless but can be cleaned up: `DELETE FROM wp_options WHERE option_name = 'wpcusn_sync_logs';`
+- The new `{prefix}wpcusn_sync_logs` table is created automatically — no manual SQL required on upgrade.
+- To view logs, query: `SELECT * FROM wp_wpcusn_sync_logs ORDER BY created_at DESC LIMIT 100;`
+
+## [1.4.4] - 02/04/2026
+
+### Fixed
+- **CRITICAL — Admin Slowdown: Removed Auto-Trigger AJAX on Post Edit Load:** The post meta box was silently firing a ClickUp API request (30-second timeout) on *every* post-edit page load for unlinked posts via a `setTimeout` JavaScript trigger. This was the primary cause of progressive admin UI freezes. The automatic trigger has been removed entirely. The "Try Auto-Link Now" button remains fully functional for manual use, and background auto-linking continues via the twice-daily cron job.
+- **CRITICAL — `wp_options` Autoload Bloat from Sync Logs:** All 8 locations writing to the `wpcusn_sync_logs` option now pass `false` as the third argument to `update_option()`, disabling autoload. Previously, the growing serialized log array (up to 200 entries) was loaded into PHP memory on *every single WordPress admin request*, not just when the sync log was being viewed. Affected files: `class-status-mapper.php`, `class-webhook-handler.php`, `class-task-linker.php`, `class-clickup-api.php`. **Action required on live site:** Run `DELETE FROM wp_options WHERE option_name = 'wpcusn_sync_logs';` to immediately clear the existing bloated option.
+- **CRITICAL — Cascading API Calls on Post Status Change:** `status_exists_in_list()` in `class-status-mapper.php` previously made a fresh ClickUp API call on *every* WordPress post status change to validate that the target ClickUp status exists in the list. List statuses rarely change. This validation result is now cached in a WordPress transient (`wpcusn_list_statuses_{list_id}`) for 24 hours, eliminating the redundant API call on subsequent status changes.
+
+### Changed
+- **Reduced ClickUp API Timeout from 30s to 10s:** The `wp_remote_request()` call in `class-clickup-api.php` previously used a 30-second timeout. With up to 3 sequential API calls per post status change, a slow ClickUp response could block the admin thread for 90 seconds. The timeout is now 10 seconds to fail fast and surface errors rather than stalling the UI.
+
 ## [1.4.3] - 01/04/2026
 
 ### Changed
