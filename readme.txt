@@ -4,7 +4,7 @@ Tags: clickup, sync, wordpress, tasks, status
 Requires at least: 6.8
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 1.5.2
+Stable tag: 1.5.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -93,6 +93,9 @@ The post will not be linked, but you can manually link it later or rename the Cl
 Currently, the plugin only works with the default "post" post type. Support for custom post types may be added in future versions.
 
 == Changelog ==
+
+= 1.5.3 =
+* Fixed: Auto-link no longer runs during Bulk Edit or Quick Edit on the posts list (avoids many ClickUp API calls in one request). Full editor save, manual “Try Auto-Link Now”, and the scheduled cron job still perform linking as before.
 
 = 1.5.2 =
 * Fixed: ClickUp API debug logging now uses the same database log as all other sync events (no more legacy wp_options writes); entries show in the settings log panel.

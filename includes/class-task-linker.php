@@ -185,6 +185,19 @@ class WPCUSN_Task_Linker {
 			return;
 		}
 
+		// Skip bulk edit (Posts list → Edit → Update) and Quick Edit — core still fires
+		// save_post per post; without this, every unlinked row triggers ClickUp API calls.
+		if ( isset( $_REQUEST['bulk_edit'] ) ) {
+			return;
+		}
+		if (
+			defined( 'DOING_AJAX' ) && DOING_AJAX
+			&& isset( $_POST['action'] )
+			&& 'inline-save' === $_POST['action']
+		) {
+			return;
+		}
+
 		// Check if already linked
 		$existing_task_id = get_post_meta( $post_id, '_clickup_task_id', true );
 		if ( $existing_task_id ) {

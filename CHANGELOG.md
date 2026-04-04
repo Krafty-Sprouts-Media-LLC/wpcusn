@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 02/04/2026
+
+### Fixed
+- **`class-task-linker.php` — `auto_link_task()`:** Skips ClickUp auto-link when the save comes from **Bulk Edit** (`isset( $_REQUEST['bulk_edit'] )`, set by core in `wp-admin/edit.php` when applying bulk edit) or **Quick Edit** (`DOING_AJAX` and `$_POST['action'] === 'inline-save'`). Prevents one API storm per mass update on the posts list. Full editor saves, the meta box “Try Auto-Link Now” AJAX action, and the twice-daily cron job are unchanged.
+
 ## [1.5.2] - 02/04/2026
 
 ### Fixed
