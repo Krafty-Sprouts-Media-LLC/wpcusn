@@ -90,7 +90,7 @@ class WPCUSN_Post_Meta_Box
 	{
 		// PERFORMANCE FIX: Auto-trigger removed. The "Try Auto-Link Now"
 		// button in the meta box is still available for manual use.
-		// Automatic linking now happens via the twice-daily cron job only.
+		// Automatic linking also runs on a background cron job (every 6 hours by default).
 		return;
 	}
 

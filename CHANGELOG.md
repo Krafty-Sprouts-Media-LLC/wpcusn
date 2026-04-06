@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] - 06/04/2026
+
+### Fixed
+- **Hyphenated compounds vs slug titles (`class-clickup-api.php`, `class-task-linker.php`):** Post slugs turn hyphens into spaces (`4-year-old` → `4 year old`), but ClickUp titles like `4-Year-Old` had hyphens removed as punctuation only, producing `4yearold`, so exact/normalised matching failed. Normalisation now converts hyphens and en/em dashes to spaces **before** stripping other punctuation, so titles such as *Is It Normal for a 4-Year-Old to Still Take Naps?* match slug `is-it-normal-for-a-4-year-old-to-still-take-naps`. This was **not** a pagination or page-limit issue.
+
+### Changed
+- **Auto-link cron interval (`class-task-linker.php`):** Replaced core `twicedaily` (~2 runs per day) with a custom **every 6 hours** schedule (~4 runs per day). On upgrade, the old event is cleared and rescheduled once (`wpcusn_auto_link_cron_interval` option tracks the active schedule). **WP-Cron still depends on site traffic** unless a real system cron hits `wp-cron.php`; very quiet sites may see drift.
+
 ## [1.5.3] - 02/04/2026
 
 ### Fixed

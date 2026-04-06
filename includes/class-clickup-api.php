@@ -720,6 +720,9 @@ class WPCUSN_ClickUp_API
 	 */
 	private function normalize_for_match($name)
 	{
+		// Turn hyphenated compounds into word breaks before stripping punctuation, so
+		// ClickUp "4-Year-Old" matches slug-derived "4 year old" (hyphens in slugs are spaces).
+		$name = preg_replace('/[-–—]+/u', ' ', (string) $name);
 		$name = preg_replace('/[[:punct:]]+/u', '', $name);
 		return preg_replace('/\s+/u', ' ', trim($name));
 	}

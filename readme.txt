@@ -4,7 +4,7 @@ Tags: clickup, sync, wordpress, tasks, status
 Requires at least: 6.8
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 1.5.3
+Stable tag: 1.5.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -93,6 +93,10 @@ The post will not be linked, but you can manually link it later or rename the Cl
 Currently, the plugin only works with the default "post" post type. Support for custom post types may be added in future versions.
 
 == Changelog ==
+
+= 1.5.4 =
+* Fixed: Auto-link matching for hyphenated words in ClickUp (e.g. "4-Year-Old") vs slugs that use spaces ("4-year-old" in the URL).
+* Changed: Background auto-link cron runs about every 6 hours instead of twice per day (WP-Cron timing still depends on site visits unless real server cron is configured).
 
 = 1.5.3 =
 * Fixed: Auto-link no longer runs during Bulk Edit or Quick Edit on the posts list (avoids many ClickUp API calls in one request). Full editor save, manual “Try Auto-Link Now”, and the scheduled cron job still perform linking as before.

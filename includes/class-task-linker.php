@@ -22,6 +22,15 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Task Linker Class
  */
 class WPCUSN_Task_Linker {
+
+	/**
+	 * WP-Cron schedule slug for periodic auto-link (registered via cron_schedules).
+	 *
+	 * @since 1.5.4
+	 * @var string
+	 */
+	const AUTO_LINK_CRON_SCHEDULE = 'wpcusn_every_6_hours';
+
 	/**
 	 * Single instance
 	 *
@@ -48,15 +57,47 @@ class WPCUSN_Task_Linker {
 	 * @since 1.0.0
 	 */
 	private function __construct() {
+		add_filter( 'cron_schedules', array( __CLASS__, 'register_auto_link_cron_schedule' ) );
+
 		add_action( 'save_post', array( $this, 'auto_link_task' ), 10, 2 );
-		
-		// Schedule cron job for periodic auto-linking
+
 		add_action( 'wpcusn_cron_auto_link', array( $this, 'cron_auto_link_posts' ) );
-		
-		// Schedule the cron event if not already scheduled
-		if ( ! wp_next_scheduled( 'wpcusn_cron_auto_link' ) ) {
-			wp_schedule_event( time(), 'twicedaily', 'wpcusn_cron_auto_link' );
+
+		$this->maybe_reschedule_auto_link_cron();
+	}
+
+	/**
+	 * Register custom cron interval (~4 runs per day).
+	 *
+	 * @since 1.5.4
+	 * @param array $schedules WP cron schedules.
+	 * @return array
+	 */
+	public static function register_auto_link_cron_schedule( $schedules ) {
+		if ( ! isset( $schedules[ self::AUTO_LINK_CRON_SCHEDULE ] ) ) {
+			$schedules[ self::AUTO_LINK_CRON_SCHEDULE ] = array(
+				'interval' => 6 * HOUR_IN_SECONDS,
+				'display'  => __( 'Every 6 hours (WPCUSN auto-link)', 'wpcusn' ),
+			);
 		}
+		return $schedules;
+	}
+
+	/**
+	 * Ensure auto-link cron uses the current schedule (upgrades from twicedaily, etc.).
+	 *
+	 * @since 1.5.4
+	 * @return void
+	 */
+	private function maybe_reschedule_auto_link_cron() {
+		$stored = get_option( 'wpcusn_auto_link_cron_interval', '' );
+		if ( self::AUTO_LINK_CRON_SCHEDULE === $stored && wp_next_scheduled( 'wpcusn_cron_auto_link' ) ) {
+			return;
+		}
+
+		wp_clear_scheduled_hook( 'wpcusn_cron_auto_link' );
+		wp_schedule_event( time(), self::AUTO_LINK_CRON_SCHEDULE, 'wpcusn_cron_auto_link' );
+		update_option( 'wpcusn_auto_link_cron_interval', self::AUTO_LINK_CRON_SCHEDULE, false );
 	}
 
 	/**
@@ -85,6 +126,9 @@ class WPCUSN_Task_Linker {
 	 */
 	private function normalize_task_name( $name ) {
 		$name = strtolower( trim( (string) $name ) );
+
+		// Match ClickUp API normalize_for_match(): hyphens first → spaces (e.g. "4-Year-Old" vs slug "4 year old").
+		$name = preg_replace( '/[-–—]+/u', ' ', $name );
 
 		// Remove common punctuation characters to avoid mismatch on trailing symbols like "?"
 		$name = preg_replace( '/[[:punct:]]+/u', '', $name );
