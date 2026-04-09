@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.5] - 09/04/2026
+
+### Fixed
+- **CRITICAL — Phase 3: `auto_link_task()` async deferral (`class-task-linker.php`, `wpcusn.php`):** The `save_post` hook previously called `auto_link_task()` synchronously, executing an exhaustive paginated ClickUp API search (up to 25 API calls × 10s each = ~250s) on the admin thread for every post save, publish, trash, restore, or schedule operation on an unlinked post. This was the direct cause of 1-4 minute freezes when saving/trashing articles and the root cause of scheduling plugin failures (PHP execution timeout starved by WPCUSN's blocking API calls). The fix mirrors the Phase 2 pattern used by `sync_to_clickup()`: `save_post` now calls the new `schedule_auto_link()` method which performs only cheap, in-memory validation and then calls `wp_schedule_single_event()` + `spawn_cron()`, returning to the browser in milliseconds. The actual ClickUp search runs inside the new `run_async_auto_link()` method on the next WP-Cron tick, completely off the admin thread. The `wpcusn_do_auto_link` cron action is registered in `wpcusn.php`.
+- **CRITICAL — Trash/auto-draft guard (`class-task-linker.php`):** `auto_link_task()` previously attempted a full ClickUp search when a post was being trashed (`wp_trash_post()` fires `save_post` internally), restored, or when WordPress created an `auto-draft` placeholder. Added a guard that returns immediately for `trash`, `auto-draft`, and `inherit` statuses — linking a post being deleted is pointless and only added latency.
+- **CRITICAL — "Not found" cooldown transient (`class-task-linker.php`):** When a slug search returned no ClickUp match, no result was cached, so every subsequent save re-triggered the same full exhaustive search. Added a 6-hour transient per slug (`wpcusn_no_match_{md5(slug)}`) that is set after a failed search. Consecutive saves of the same unlinked post now return instantly from the guard check. The 6-hour TTL aligns with the background cron interval so newly-created ClickUp tasks are still discovered promptly.
+
 ## [1.5.4] - 06/04/2026
 
 ### Fixed

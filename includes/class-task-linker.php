@@ -11,6 +11,17 @@
  * PHASE 2 CHANGE (02/04/2026):
  * All private log_auto_link_*() methods now route through WPCUSN_Sync_Logger::insert()
  * (dedicated DB table) instead of the wpcusn_sync_logs wp_options key.
+ *
+ * PHASE 3 CHANGE (09/04/2026):
+ * auto_link_task() no longer runs synchronously on save_post. The hook now
+ * only schedules a wp_schedule_single_event() cron job (wpcusn_do_auto_link)
+ * and calls spawn_cron() so the admin thread returns immediately. The actual
+ * ClickUp search runs inside run_async_auto_link() on the next cron tick.
+ * Three additional guards were added:
+ *   1. Skip trash / auto-draft / inherit post statuses (no reason to search).
+ *   2. "Not found" cooldown transient per slug (6h) prevents repeated futile
+ *      searches when the keyword does not exist in ClickUp.
+ *   Both guards also apply inside run_async_auto_link() for safety.
  */
 
 // Exit if accessed directly
@@ -59,7 +70,12 @@ class WPCUSN_Task_Linker {
 	private function __construct() {
 		add_filter( 'cron_schedules', array( __CLASS__, 'register_auto_link_cron_schedule' ) );
 
-		add_action( 'save_post', array( $this, 'auto_link_task' ), 10, 2 );
+		// PHASE 3 (09/04/2026): save_post only SCHEDULES the work — it no longer
+		// runs the ClickUp search inline. Zero admin-thread blocking.
+		add_action( 'save_post', array( $this, 'schedule_auto_link' ), 10, 2 );
+
+		// Cron: execute the deferred auto-link search (off admin thread).
+		add_action( 'wpcusn_do_auto_link', array( $this, 'run_async_auto_link' ), 10, 2 );
 
 		add_action( 'wpcusn_cron_auto_link', array( $this, 'cron_auto_link_posts' ) );
 
@@ -212,7 +228,151 @@ class WPCUSN_Task_Linker {
 	}
 
 	/**
-	 * Auto-link post to ClickUp task
+	 * Statuses in which auto-linking serves no purpose and should be skipped.
+	 *
+	 * - trash:      Post is being deleted — no point searching ClickUp.
+	 * - auto-draft: WordPress pre-save placeholder — has no real slug yet.
+	 * - inherit:    Attachment / revision — not a real post.
+	 *
+	 * @since 1.5.5
+	 * @var array
+	 */
+	const SKIP_AUTO_LINK_STATUSES = array( 'trash', 'auto-draft', 'inherit' );
+
+	/**
+	 * Transient TTL for "not found" cooldown (6 hours).
+	 *
+	 * When a slug search returns no match, a transient is set so the same
+	 * exhaustive search is not repeated on every subsequent save within the
+	 * cooldown window. The 6-hour TTL aligns with the background cron interval
+	 * so any newly-created ClickUp tasks will be picked up by the next cron run.
+	 *
+	 * @since 1.5.5
+	 * @var int
+	 */
+	const NOT_FOUND_COOLDOWN_TTL = 6 * HOUR_IN_SECONDS;
+
+	/**
+	 * Schedule async auto-link on save_post (fast — runs on the admin thread).
+	 *
+	 * PHASE 3 (09/04/2026): This replaces the old direct auto_link_task() call
+	 * on save_post. It validates cheaply (no API calls) and then schedules a
+	 * wpcusn_do_auto_link cron event, returning to the browser immediately.
+	 * The actual ClickUp search runs in run_async_auto_link() on the next
+	 * WP-Cron tick — completely off the main admin thread.
+	 *
+	 * @since 1.5.5
+	 * @param int     $post_id Post ID.
+	 * @param WP_Post $post    Post object.
+	 */
+	public function schedule_auto_link( $post_id, $post ) {
+		// Only for posts.
+		if ( 'post' !== $post->post_type ) {
+			return;
+		}
+
+		// Skip autosaves and revisions.
+		if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
+			return;
+		}
+
+		// Skip bulk edit and Quick Edit.
+		if ( isset( $_REQUEST['bulk_edit'] ) ) {
+			return;
+		}
+		if (
+			defined( 'DOING_AJAX' ) && DOING_AJAX
+			&& isset( $_POST['action'] )
+			&& 'inline-save' === $_POST['action']
+		) {
+			return;
+		}
+
+		// GUARD 1: Skip statuses where linking is pointless.
+		if ( in_array( $post->post_status, self::SKIP_AUTO_LINK_STATUSES, true ) ) {
+			return;
+		}
+
+		// Already linked — nothing to do.
+		if ( get_post_meta( $post_id, '_clickup_task_id', true ) ) {
+			return;
+		}
+
+		// No slug yet — nothing to search.
+		if ( ! $post->post_name ) {
+			return;
+		}
+
+		// Plugin not configured — bail fast.
+		if ( ! get_option( 'wpcusn_space_id' ) && ! get_option( 'wpcusn_list_id' ) ) {
+			return;
+		}
+
+		// GUARD 2: "Not found" cooldown — skip if this slug was searched recently.
+		$cooldown_key = 'wpcusn_no_match_' . md5( $post->post_name );
+		if ( get_transient( $cooldown_key ) ) {
+			return;
+		}
+
+		// All guards passed. Schedule the API search for the next cron tick.
+		wp_schedule_single_event(
+			time(),
+			'wpcusn_do_auto_link',
+			array( $post_id, $post->post_name )
+		);
+
+		// Spawn cron immediately so the job runs on this page load's shutdown
+		// rather than waiting for the next organic visitor.
+		if ( ! defined( 'DOING_CRON' ) ) {
+			spawn_cron();
+		}
+	}
+
+	/**
+	 * Execute the deferred auto-link search (slow — runs inside WP-Cron).
+	 *
+	 * Called by the wpcusn_do_auto_link cron action registered in wpcusn.php.
+	 * Runs completely outside of the admin request cycle.
+	 *
+	 * @since 1.5.5
+	 * @param int    $post_id   WordPress post ID.
+	 * @param string $slug      Post slug at the time schedule_auto_link() fired.
+	 */
+	public function run_async_auto_link( $post_id, $slug ) {
+		$post = get_post( $post_id );
+		if ( ! $post || 'post' !== $post->post_type ) {
+			return;
+		}
+
+		// Re-check: may have been linked or trashed between scheduling and execution.
+		if ( get_post_meta( $post_id, '_clickup_task_id', true ) ) {
+			return;
+		}
+
+		if ( in_array( $post->post_status, self::SKIP_AUTO_LINK_STATUSES, true ) ) {
+			return;
+		}
+
+		// Use the slug passed at schedule time; fall back to current slug.
+		$slug = $slug ?: $post->post_name;
+		if ( ! $slug ) {
+			return;
+		}
+
+		// Run the actual search.
+		$this->auto_link_task( $post_id, $post );
+	}
+
+	/**
+	 * Auto-link post to ClickUp task.
+	 *
+	 * This is the internal search worker. It is called by:
+	 *   - run_async_auto_link()  (deferred from save_post via cron)
+	 *   - cron_auto_link_posts() (background batch cron every 6 hours)
+	 *   - handle_try_auto_link() AJAX (manual "Try Auto-Link Now" button)
+	 *
+	 * It should NOT be called directly from save_post anymore — use
+	 * schedule_auto_link() instead so the admin thread is not blocked.
 	 *
 	 * @since 1.0.0
 	 * @param int     $post_id Post ID
@@ -242,6 +402,11 @@ class WPCUSN_Task_Linker {
 			return;
 		}
 
+		// GUARD 1: Skip statuses where linking is pointless.
+		if ( in_array( $post->post_status, self::SKIP_AUTO_LINK_STATUSES, true ) ) {
+			return;
+		}
+
 		// Check if already linked
 		$existing_task_id = get_post_meta( $post_id, '_clickup_task_id', true );
 		if ( $existing_task_id ) {
@@ -254,9 +419,16 @@ class WPCUSN_Task_Linker {
 			return;
 		}
 
+		// GUARD 2: "Not found" cooldown — skip if this slug was searched recently
+		// and came back empty. The cron will retry after the cooldown expires.
+		$cooldown_key = 'wpcusn_no_match_' . md5( $slug );
+		if ( get_transient( $cooldown_key ) ) {
+			return;
+		}
+
 		// Get space ID (primary) or list ID (fallback)
 		$space_id = get_option( 'wpcusn_space_id' );
-		$list_id = get_option( 'wpcusn_list_id' );
+		$list_id  = get_option( 'wpcusn_list_id' );
 
 		if ( ! $space_id && ! $list_id ) {
 			return;
@@ -269,7 +441,7 @@ class WPCUSN_Task_Linker {
 		$this->log_auto_link_attempt( $post_id, $slug, $task_name, $space_id, $list_id );
 
 		// Search for task in ClickUp
-		$api = WPCUSN_ClickUp_API::get_instance();
+		$api    = WPCUSN_ClickUp_API::get_instance();
 		$result = $api->search_tasks( $space_id ?: $list_id, $task_name, $list_id );
 
 		if ( is_wp_error( $result ) ) {
@@ -278,13 +450,12 @@ class WPCUSN_Task_Linker {
 		}
 
 		// Find exact match using normalized comparison (case-insensitive, punctuation-insensitive)
-		$matched = false;
+		$matched           = false;
 		$search_normalized = $this->normalize_task_name( $task_name );
 
 		if ( isset( $result['tasks'] ) && is_array( $result['tasks'] ) ) {
 			foreach ( $result['tasks'] as $task ) {
-				// Match task name using normalized comparison.
-				$task_name_match = isset( $task['name'] ) ? $task['name'] : '';
+				$task_name_match      = isset( $task['name'] ) ? $task['name'] : '';
 				$task_name_normalized = $this->normalize_task_name( $task_name_match );
 
 				if ( $task_name_normalized === $search_normalized ) {
@@ -307,7 +478,8 @@ class WPCUSN_Task_Linker {
 			}
 		}
 
-		// Log if no match found
+		// Log if no match found and set cooldown so the same slug is not
+		// searched again within the NOT_FOUND_COOLDOWN_TTL window.
 		if ( ! $matched ) {
 			$task_count = isset( $result['tasks'] ) ? count( $result['tasks'] ) : 0;
 			$found_names = array();
@@ -318,9 +490,18 @@ class WPCUSN_Task_Linker {
 					}
 				}
 			}
-			$found_list = ! empty( $found_names ) ? " Found tasks: " . implode( ', ', array_slice( $found_names, 0, 5 ) ) . ( count( $found_names ) > 5 ? '...' : '' ) : '';
+			$found_list  = ! empty( $found_names )
+				? ' Found tasks: ' . implode( ', ', array_slice( $found_names, 0, 5 ) ) . ( count( $found_names ) > 5 ? '...' : '' )
+				: '';
 			$diagnostics = $this->format_search_diagnostics( $result );
-			$this->log_auto_link_failure( $post_id, $slug, $task_name, "No matching task found. Searched for: '{$task_name}' (from slug: '{$slug}'). Returned {$task_count} candidate task(s).{$found_list}{$diagnostics}" );
+			$this->log_auto_link_failure(
+				$post_id, $slug, $task_name,
+				"No matching task found. Searched for: '{$task_name}' (from slug: '{$slug}'). Returned {$task_count} candidate task(s).{$found_list}{$diagnostics}"
+			);
+
+			// Set cooldown transient so this slug is not re-searched within the
+			// NOT_FOUND_COOLDOWN_TTL window (default 6 hours).
+			set_transient( $cooldown_key, true, self::NOT_FOUND_COOLDOWN_TTL );
 		}
 	}
 

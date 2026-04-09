@@ -4,7 +4,7 @@ Tags: clickup, sync, wordpress, tasks, status
 Requires at least: 6.8
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 1.5.4
+Stable tag: 1.5.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -93,6 +93,11 @@ The post will not be linked, but you can manually link it later or rename the Cl
 Currently, the plugin only works with the default "post" post type. Support for custom post types may be added in future versions.
 
 == Changelog ==
+
+= 1.5.5 =
+* Fixed (CRITICAL): Saving, publishing, trashing, restoring, or scheduling any unlinked post no longer blocks the admin thread with a synchronous ClickUp API search. `save_post` now only schedules a WP-Cron job (`wpcusn_do_auto_link`) and returns instantly; the search runs asynchronously off the admin thread (Phase 3 — mirrors Phase 2 pattern for status sync).
+* Fixed (CRITICAL): Trash, auto-draft, and inherit post statuses are now skipped immediately — no ClickUp search is triggered when a post is being deleted or is a WordPress placeholder.
+* Fixed (CRITICAL): A 6-hour "not found" cooldown transient is set per slug after a failed search. Consecutive saves of the same unlinked post are now instant instead of triggering the full exhaustive API search each time.
 
 = 1.5.4 =
 * Fixed: Auto-link matching for hyphenated words in ClickUp (e.g. "4-Year-Old") vs slugs that use spaces ("4-year-old" in the URL).

@@ -3,7 +3,7 @@
  * Plugin Name: WPCUSN - WordPress ClickUp Sync-nator
  * Plugin URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
  * Description: Two-way status synchronization between WordPress and ClickUp
- * Version: 1.5.4
+ * Version: 1.5.5
  * Author: Krafty Sprouts Media, LLC
  * Author URI: https://animalofthings.com
  * GitHub URI: https://github.com/Krafty-Sprouts-Media-LLC/wpcusn
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WPCUSN_VERSION', '1.5.4');
+define('WPCUSN_VERSION', '1.5.5');
 define('WPCUSN_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WPCUSN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WPCUSN_PLUGIN_FILE', __FILE__);
@@ -157,6 +157,11 @@ class WPCUSN
 		// PHASE 2 (02/04/2026): Async status sync handler.
 		// Registered here so it is available during cron execution.
 		add_action( 'wpcusn_do_sync_to_clickup', array( WPCUSN_Status_Mapper::get_instance(), 'run_async_sync' ), 10, 4 );
+
+		// PHASE 3 (09/04/2026): Async auto-link handler.
+		// Defers the ClickUp task search triggered by save_post to a cron tick
+		// so the admin thread is never blocked by ClickUp API calls.
+		add_action( 'wpcusn_do_auto_link', array( WPCUSN_Task_Linker::get_instance(), 'run_async_auto_link' ), 10, 2 );
 	}
 }
 
