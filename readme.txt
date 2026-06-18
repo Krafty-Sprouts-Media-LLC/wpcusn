@@ -4,7 +4,7 @@ Tags: clickup, sync, wordpress, tasks, status
 Requires at least: 6.8
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 1.5.5
+Stable tag: 1.5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -93,6 +93,9 @@ The post will not be linked, but you can manually link it later or rename the Cl
 Currently, the plugin only works with the default "post" post type. Support for custom post types may be added in future versions.
 
 == Changelog ==
+
+= 1.5.6 =
+* Added: Auto-link now matches when the post slug is longer than the ClickUp task name — e.g. AI-generated slugs that combine the task name with the article title. Supports exact, prefix, and word-boundary containment matching; links only when one unambiguous candidate is found and skips tasks already linked to another post.
 
 = 1.5.5 =
 * Fixed (CRITICAL): Saving, publishing, trashing, restoring, or scheduling any unlinked post no longer blocks the admin thread with a synchronous ClickUp API search. `save_post` now only schedules a WP-Cron job (`wpcusn_do_auto_link`) and returns instantly; the search runs asynchronously off the admin thread (Phase 3 — mirrors Phase 2 pattern for status sync).

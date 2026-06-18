@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.6] - 18/06/2026
+
+### Added
+- **Partial slug ↔ ClickUp task matching (`class-task-linker.php`):** Auto-linking no longer requires the post slug to exactly equal the ClickUp task name. When an AI writer merges the task name with the article title into one slug (e.g. slug `chronic-wasting-disease-laws-in-missouri-what-hunters-and-landowners-must-know` vs ClickUp task `Chronic wasting disease laws in Missouri`), the plugin now links via tiered matching: exact → prefix at word boundaries → task name contained elsewhere in the slug. Only one unambiguous best candidate is linked; ties are logged as ambiguous. ClickUp tasks already linked to another post are skipped.
+
 ## [1.5.5] - 09/04/2026
 
 ### Fixed

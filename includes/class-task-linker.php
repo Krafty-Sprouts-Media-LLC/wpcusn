@@ -156,6 +156,297 @@ class WPCUSN_Task_Linker {
 	}
 
 	/**
+	 * Whether a normalized string is long enough for prefix/containment matching.
+	 *
+	 * @since 1.5.6
+	 * @param string $normalized Normalized task or slug string.
+	 * @return bool
+	 */
+	private function is_long_enough_for_partial_match( $normalized ) {
+		if ( strlen( $normalized ) >= self::PARTIAL_MATCH_MIN_CHARS ) {
+			return true;
+		}
+
+		return str_word_count( $normalized ) >= self::PARTIAL_MATCH_MIN_WORDS;
+	}
+
+	/**
+	 * Whether $shorter is a whole-word prefix of $longer.
+	 *
+	 * @since 1.5.6
+	 * @param string $longer Normalized longer string.
+	 * @param string $shorter Normalized shorter string.
+	 * @return bool
+	 */
+	private function is_word_boundary_prefix( $longer, $shorter ) {
+		if ( '' === $shorter || strlen( $shorter ) >= strlen( $longer ) ) {
+			return false;
+		}
+
+		if ( 0 !== strpos( $longer, $shorter ) ) {
+			return false;
+		}
+
+		$next_char = substr( $longer, strlen( $shorter ), 1 );
+
+		return '' === $next_char || ' ' === $next_char;
+	}
+
+	/**
+	 * Whether $needle appears inside $haystack at whole-word boundaries.
+	 *
+	 * @since 1.5.6
+	 * @param string $haystack Normalized haystack string.
+	 * @param string $needle Normalized needle string.
+	 * @return bool
+	 */
+	private function contains_at_word_boundary( $haystack, $needle ) {
+		if ( '' === $needle || strlen( $needle ) > strlen( $haystack ) ) {
+			return false;
+		}
+
+		if ( $needle === $haystack ) {
+			return true;
+		}
+
+		$offset     = 0;
+		$needle_len = strlen( $needle );
+		$hay_len    = strlen( $haystack );
+
+		while ( $offset <= $hay_len - $needle_len ) {
+			$pos = strpos( $haystack, $needle, $offset );
+			if ( false === $pos ) {
+				return false;
+			}
+
+			$before_ok = ( 0 === $pos ) || ( ' ' === $haystack[ $pos - 1 ] );
+			$after_pos = $pos + $needle_len;
+			$after_ok  = ( $after_pos === $hay_len ) || ( ' ' === $haystack[ $after_pos ] );
+
+			if ( $before_ok && $after_ok ) {
+				return true;
+			}
+
+			$offset = $pos + 1;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Classify how a slug-derived string relates to a ClickUp task name.
+	 *
+	 * Tiers: 1 = exact, 2 = prefix (AI keyword + title slug), 3 = contains elsewhere in slug.
+	 *
+	 * @since 1.5.6
+	 * @param string $search_normalized Normalized slug-derived search string.
+	 * @param string $task_normalized Normalized ClickUp task name.
+	 * @return array|null {
+	 *     @type int    $tier        Lower is better (1 exact, 2 prefix, 3 contains).
+	 *     @type string $type        exact|prefix|contains.
+	 *     @type int    $specificity Length of the shorter matching segment.
+	 * }
+	 */
+	private function classify_slug_task_match( $search_normalized, $task_normalized ) {
+		if ( '' === $search_normalized || '' === $task_normalized ) {
+			return null;
+		}
+
+		if ( $task_normalized === $search_normalized ) {
+			return array(
+				'tier'        => 1,
+				'type'        => 'exact',
+				'specificity' => strlen( $task_normalized ),
+			);
+		}
+
+		$shorter = ( strlen( $search_normalized ) <= strlen( $task_normalized ) ) ? $search_normalized : $task_normalized;
+		$longer  = ( strlen( $search_normalized ) > strlen( $task_normalized ) ) ? $search_normalized : $task_normalized;
+
+		if ( ! $this->is_long_enough_for_partial_match( $shorter ) ) {
+			return null;
+		}
+
+		if ( $this->is_word_boundary_prefix( $longer, $shorter ) ) {
+			return array(
+				'tier'        => 2,
+				'type'        => 'prefix',
+				'specificity' => strlen( $shorter ),
+			);
+		}
+
+		if (
+			$this->contains_at_word_boundary( $search_normalized, $task_normalized )
+			|| $this->contains_at_word_boundary( $task_normalized, $search_normalized )
+		) {
+			return array(
+				'tier'        => 3,
+				'type'        => 'contains',
+				'specificity' => strlen( $shorter ),
+			);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Whether a ClickUp task is already linked to a different WordPress post.
+	 *
+	 * @since 1.5.6
+	 * @param string $task_id ClickUp task ID.
+	 * @param int    $current_post_id Post being auto-linked.
+	 * @return bool
+	 */
+	private function is_clickup_task_linked_to_other_post( $task_id, $current_post_id ) {
+		$linked = get_posts(
+			array(
+				'post_type'      => 'post',
+				'post_status'    => 'any',
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'meta_key'       => '_clickup_task_id',
+				'meta_value'     => (string) $task_id,
+				'post__not_in'   => array( (int) $current_post_id ),
+			)
+		);
+
+		return ! empty( $linked );
+	}
+
+	/**
+	 * Pick the best single ClickUp task from search candidates.
+	 *
+	 * Prefers exact matches, then prefix (slug starts/ends with task name), then
+	 * word-boundary containment when the task name appears elsewhere in the slug.
+	 * Only auto-links when one unambiguous best candidate remains among tasks not
+	 * already linked to another post.
+	 *
+	 * @since 1.5.6
+	 * @param array  $tasks Task objects from ClickUp search.
+	 * @param string $search_normalized Normalized slug-derived search string.
+	 * @param int    $post_id Current post ID.
+	 * @return array {
+	 *     @type array|null $task       Winning task, or null.
+	 *     @type string     $match_type exact|prefix|contains|''.
+	 *     @type string     $reason     empty|ambiguous|already_linked_elsewhere.
+	 *     @type array      $ambiguous_names Task names when reason is ambiguous.
+	 * }
+	 */
+	private function resolve_task_match( $tasks, $search_normalized, $post_id ) {
+		$empty_result = array(
+			'task'             => null,
+			'match_type'       => '',
+			'reason'           => '',
+			'ambiguous_names'  => array(),
+		);
+
+		if ( ! is_array( $tasks ) || empty( $tasks ) ) {
+			return $empty_result;
+		}
+
+		$candidates = array();
+
+		foreach ( $tasks as $task ) {
+			if ( empty( $task['id'] ) || ! isset( $task['name'] ) ) {
+				continue;
+			}
+
+			if ( $this->is_clickup_task_linked_to_other_post( $task['id'], $post_id ) ) {
+				continue;
+			}
+
+			$task_normalized = $this->normalize_task_name( $task['name'] );
+			$classification  = $this->classify_slug_task_match( $search_normalized, $task_normalized );
+
+			if ( null === $classification ) {
+				continue;
+			}
+
+			$candidates[] = array(
+				'task'        => $task,
+				'tier'        => $classification['tier'],
+				'type'        => $classification['type'],
+				'specificity' => $classification['specificity'],
+			);
+		}
+
+		if ( empty( $candidates ) ) {
+			return $empty_result;
+		}
+
+		$best_tier = $candidates[0]['tier'];
+		foreach ( $candidates as $candidate ) {
+			if ( $candidate['tier'] < $best_tier ) {
+				$best_tier = $candidate['tier'];
+			}
+		}
+
+		$tier_candidates = array();
+		foreach ( $candidates as $candidate ) {
+			if ( $candidate['tier'] === $best_tier ) {
+				$tier_candidates[] = $candidate;
+			}
+		}
+
+		$max_specificity = $tier_candidates[0]['specificity'];
+		foreach ( $tier_candidates as $candidate ) {
+			if ( $candidate['specificity'] > $max_specificity ) {
+				$max_specificity = $candidate['specificity'];
+			}
+		}
+
+		$best_candidates = array();
+		foreach ( $tier_candidates as $candidate ) {
+			if ( $candidate['specificity'] === $max_specificity ) {
+				$best_candidates[] = $candidate;
+			}
+		}
+
+		if ( 1 !== count( $best_candidates ) ) {
+			$ambiguous_names = array();
+			foreach ( $tier_candidates as $candidate ) {
+				$ambiguous_names[] = $candidate['task']['name'];
+			}
+
+			return array(
+				'task'            => null,
+				'match_type'      => '',
+				'reason'          => 'ambiguous',
+				'ambiguous_names' => array_values( array_unique( $ambiguous_names ) ),
+			);
+		}
+
+		return array(
+			'task'            => $best_candidates[0]['task'],
+			'match_type'      => $best_candidates[0]['type'],
+			'reason'          => '',
+			'ambiguous_names' => array(),
+		);
+	}
+
+	/**
+	 * Persist a successful post ↔ ClickUp task link.
+	 *
+	 * @since 1.5.6
+	 * @param int    $post_id Post ID.
+	 * @param array  $task ClickUp task payload.
+	 * @param string $slug Post slug.
+	 * @param string $match_type exact|prefix|contains.
+	 */
+	private function persist_task_link( $post_id, $task, $slug, $match_type ) {
+		update_post_meta( $post_id, '_clickup_task_id', $task['id'] );
+		update_post_meta( $post_id, '_clickup_task_name', $task['name'] );
+		if ( isset( $task['list']['id'] ) ) {
+			update_post_meta( $post_id, '_clickup_list_id', $task['list']['id'] );
+		}
+		update_post_meta( $post_id, '_clickup_linked_at', current_time( 'mysql' ) );
+
+		$this->log_auto_link_success( $post_id, $slug, $task['id'], $task['name'], $match_type );
+
+		set_transient( 'wpcusn_linked_' . $post_id, true, 30 );
+	}
+
+	/**
 	 * Build a readable search diagnostics string for sync logs.
 	 *
 	 * @since 1.4.2
@@ -251,6 +542,22 @@ class WPCUSN_Task_Linker {
 	 * @var int
 	 */
 	const NOT_FOUND_COOLDOWN_TTL = 6 * HOUR_IN_SECONDS;
+
+	/**
+	 * Minimum normalized character length for prefix/containment slug matching.
+	 *
+	 * @since 1.5.6
+	 * @var int
+	 */
+	const PARTIAL_MATCH_MIN_CHARS = 15;
+
+	/**
+	 * Minimum normalized word count when below PARTIAL_MATCH_MIN_CHARS.
+	 *
+	 * @since 1.5.6
+	 * @var int
+	 */
+	const PARTIAL_MATCH_MIN_WORDS = 3;
 
 	/**
 	 * Schedule async auto-link on save_post (fast — runs on the admin thread).
@@ -449,60 +756,51 @@ class WPCUSN_Task_Linker {
 			return;
 		}
 
-		// Find exact match using normalized comparison (case-insensitive, punctuation-insensitive)
-		$matched           = false;
 		$search_normalized = $this->normalize_task_name( $task_name );
+		$tasks             = isset( $result['tasks'] ) && is_array( $result['tasks'] ) ? $result['tasks'] : array();
+		$match_resolution  = $this->resolve_task_match( $tasks, $search_normalized, $post_id );
 
-		if ( isset( $result['tasks'] ) && is_array( $result['tasks'] ) ) {
-			foreach ( $result['tasks'] as $task ) {
-				$task_name_match      = isset( $task['name'] ) ? $task['name'] : '';
-				$task_name_normalized = $this->normalize_task_name( $task_name_match );
-
-				if ( $task_name_normalized === $search_normalized ) {
-					// Store task ID and list ID
-					update_post_meta( $post_id, '_clickup_task_id', $task['id'] );
-					update_post_meta( $post_id, '_clickup_task_name', $task['name'] );
-					if ( isset( $task['list']['id'] ) ) {
-						update_post_meta( $post_id, '_clickup_list_id', $task['list']['id'] );
-					}
-					update_post_meta( $post_id, '_clickup_linked_at', current_time( 'mysql' ) );
-
-					// Log successful link
-					$this->log_auto_link_success( $post_id, $slug, $task['id'], $task['name'] );
-
-					// Add admin notice
-					set_transient( 'wpcusn_linked_' . $post_id, true, 30 );
-					$matched = true;
-					break;
-				}
-			}
+		if ( ! empty( $match_resolution['task'] ) ) {
+			$this->persist_task_link(
+				$post_id,
+				$match_resolution['task'],
+				$slug,
+				$match_resolution['match_type']
+			);
+			return;
 		}
 
 		// Log if no match found and set cooldown so the same slug is not
 		// searched again within the NOT_FOUND_COOLDOWN_TTL window.
-		if ( ! $matched ) {
-			$task_count = isset( $result['tasks'] ) ? count( $result['tasks'] ) : 0;
-			$found_names = array();
-			if ( isset( $result['tasks'] ) && is_array( $result['tasks'] ) ) {
-				foreach ( $result['tasks'] as $task ) {
-					if ( isset( $task['name'] ) ) {
-						$found_names[] = $task['name'];
-					}
-				}
+		$task_count  = count( $tasks );
+		$found_names = array();
+		foreach ( $tasks as $task ) {
+			if ( isset( $task['name'] ) ) {
+				$found_names[] = $task['name'];
 			}
-			$found_list  = ! empty( $found_names )
-				? ' Found tasks: ' . implode( ', ', array_slice( $found_names, 0, 5 ) ) . ( count( $found_names ) > 5 ? '...' : '' )
-				: '';
-			$diagnostics = $this->format_search_diagnostics( $result );
-			$this->log_auto_link_failure(
-				$post_id, $slug, $task_name,
-				"No matching task found. Searched for: '{$task_name}' (from slug: '{$slug}'). Returned {$task_count} candidate task(s).{$found_list}{$diagnostics}"
-			);
-
-			// Set cooldown transient so this slug is not re-searched within the
-			// NOT_FOUND_COOLDOWN_TTL window (default 6 hours).
-			set_transient( $cooldown_key, true, self::NOT_FOUND_COOLDOWN_TTL );
 		}
+
+		$found_list = ! empty( $found_names )
+			? ' Found tasks: ' . implode( ', ', array_slice( $found_names, 0, 5 ) ) . ( count( $found_names ) > 5 ? '...' : '' )
+			: '';
+
+		$failure_reason = "No matching task found. Searched for: '{$task_name}' (from slug: '{$slug}'). Returned {$task_count} candidate task(s).{$found_list}";
+
+		if ( 'ambiguous' === $match_resolution['reason'] && ! empty( $match_resolution['ambiguous_names'] ) ) {
+			$failure_reason .= ' Ambiguous partial matches: ' . implode(
+				', ',
+				array_slice( $match_resolution['ambiguous_names'], 0, 5 )
+			);
+			if ( count( $match_resolution['ambiguous_names'] ) > 5 ) {
+				$failure_reason .= '...';
+			}
+			$failure_reason .= '. Link manually or shorten the slug.';
+		}
+
+		$diagnostics = $this->format_search_diagnostics( $result );
+		$this->log_auto_link_failure( $post_id, $slug, $task_name, $failure_reason . $diagnostics );
+
+		set_transient( $cooldown_key, true, self::NOT_FOUND_COOLDOWN_TTL );
 	}
 
 	/**
@@ -573,13 +871,18 @@ class WPCUSN_Task_Linker {
 	 * @param string $slug Post slug
 	 * @param string $task_id Task ID
 	 * @param string $task_name Task name
+	 * @param string $match_type Optional match type: exact, prefix, or contains.
 	 */
-	private function log_auto_link_success( $post_id, $slug, $task_id, $task_name ) {
+	private function log_auto_link_success( $post_id, $slug, $task_id, $task_name, $match_type = 'exact' ) {
+		$match_label = in_array( $match_type, array( 'exact', 'prefix', 'contains' ), true )
+			? $match_type
+			: 'exact';
+
 		// PHASE 2 (02/04/2026): Log via dedicated DB table.
 		WPCUSN_Sync_Logger::insert(
 			$post_id, $task_id, 'auto_link_success',
 			"Slug: {$slug}",
-			"Linked to: '{$task_name}' ({$task_id})",
+			"Linked to: '{$task_name}' ({$task_id}) via {$match_label} match",
 			true
 		);
 	}
